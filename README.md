@@ -14,11 +14,24 @@ Recommended settings are the defaults: OpenGL renderer at 960x544, the frame cap
 
 The Vita buttons are mapped to the gamepad layout SRB2 expects, so the default controls work and everything can be rebound in Options. Cross, Circle, Square and Triangle are A, B, X and Y, L and R are the bumpers, Start and Select are Start and Back. In menus, Cross confirms, Circle goes back and Triangle answers "no". Menu prompts and the tutorial show the Vita button names.
 
+<p align="center">
+  <img src="screenshots/tutorial.png" alt="SRB2 for PS Vita tutorial" width="600">
+</p>
+
+
 Touching the top right corner of the screen opens the debug menu over the bottom half of the screen, while the game keeps running. From there you can change the FPS limit (30 or 60), show the FPS counter and SRB2's perfstats, and toggle far clip, fog, culling, the skybox, the render thread, the geometry thread, batching and a few things used for testing (walls, floors, sprites, draw submission). It also shows the real CPU/GPU clocks and free memory. Tap above the panel or on Close to hide it.
+
+<p align="center">
+  <img src="screenshots/debugmenu.png" alt="SRB2 for PS Vita debug menu" width="600">
+</p>
 
 ## Performance
 
 Most maps run at 30 to 50 FPS. Some busy spots drop to around 22 FPS with fog and far clip disabled. A few maps are still slow, for example Deep Sea Zone Act 1 stays around 12 FPS because it has over 4000 active objects and the game logic itself is the bottleneck there, not the rendering. Those maps would need manual optimization one by one, which I didn't get to.
+
+<p align="center">
+  <img src="screenshots/sonic-heroes-mod-performance-test.png" alt="Sonic Heroes mod performance test on PS Vita" width="600">
+</p>
 
 ## What was changed
 
