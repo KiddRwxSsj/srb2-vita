@@ -18,6 +18,7 @@
 /// \brief Main program, simply calls D_SRB2Main and D_SRB2Loop, the high level loop.
 
 #include "../doomdef.h"
+#include "../i_output.h"
 #include "../m_argv.h"
 #include "../d_main.h"
 #include "../m_misc.h"/* path shit */
@@ -36,6 +37,7 @@
 #ifdef __vita__
 #include <stdlib.h>
 #include <sys/stat.h>
+#include "../vita/vita_paths.h"
 #include <psp2/sysmodule.h>
 #include <psp2/net/net.h>
 #include <psp2/net/netctl.h>
@@ -103,15 +105,51 @@ typedef BOOL (WINAPI *p_IsDebuggerPresent)(VOID);
 #endif
 
 #ifdef LOGMESSAGES
+#ifdef __vita__
+static void VITA_InitLogPath(const char *logdir, struct tm *timeinfo)
+{
+	const char *format = "log-%Y-%m-%d_%H-%M-%S.txt";
+	const char *directory = "logs";
+	char filepart[sizeof logfilename];
+	int length = -1;
+
+	if (M_CheckParm("-logfile") && M_IsNextParm())
+		format = M_GetNextParm();
+	if (M_CheckParm("-logdir") && M_IsNextParm())
+		directory = M_GetNextParm();
+
+	if (*format && strftime(filepart, sizeof filepart, format, timeinfo) != 0)
+	{
+		if (filepart[0] == '/' || strchr(filepart, ':'))
+			length = snprintf(logfilename, sizeof logfilename, "%s", filepart);
+		else if (directory[0] == '/' || strchr(directory, ':'))
+			length = snprintf(logfilename, sizeof logfilename, "%s/%s", directory, filepart);
+		else
+			length = snprintf(logfilename, sizeof logfilename, "%s/" DEFAULTDIR "/%s/%s",
+				logdir, directory, filepart);
+	}
+
+	if (length < 0 || (size_t)length >= sizeof logfilename
+		|| !VITA_PathIsWritable(logfilename))
+	{
+		I_OutputMsg("Invalid log output path; using ux0:data/srb2/logs.\n");
+		strftime(logfilename, sizeof logfilename,
+			"ux0:data/srb2/logs/log-%Y-%m-%d_%H-%M-%S.txt", timeinfo);
+	}
+}
+#endif
+
 static void InitLogging(void)
 {
 	const char *logdir = NULL;
 	time_t my_time;
 	struct tm * timeinfo;
+#ifndef __vita__
 	const char *format;
 	const char *reldir;
 	int left;
 	boolean fileabs;
+#endif
 #if defined (__unix__) || defined(__APPLE__) || defined (UNIXCOMMON)
 	const char *link;
 #endif
@@ -121,6 +159,9 @@ static void InitLogging(void)
 	my_time = time(NULL);
 	timeinfo = localtime(&my_time);
 
+#ifdef __vita__
+	VITA_InitLogPath(logdir, timeinfo);
+#else
 	if (M_CheckParm("-logfile") && M_IsNextParm())
 	{
 		format = M_GetNextParm();
@@ -166,6 +207,8 @@ static void InitLogging(void)
 				format, timeinfo);
 	}
 
+#endif
+
 #ifdef __vita__
 	// "ux0:data" has no leading '/', so both paths count one part fewer than
 	// their unix equivalents; the stock bounds stop before creating logs/
@@ -179,7 +222,7 @@ static void InitLogging(void)
 #endif
 
 #if defined (__unix__) || defined(__APPLE__) || defined (UNIXCOMMON)
-	logstream = fopen(logfilename, "w");
+	logstream = I_OpenFile(logfilename, "w");
 #ifdef DEFAULTDIR
 	if (logdir)
 		link = va("%s/"DEFAULTDIR"/latest-log.txt", logdir);
@@ -192,9 +235,9 @@ static void InitLogging(void)
 		I_OutputMsg("Error symlinking latest-log.txt: %s\n", strerror(errno));
 	}
 #elif defined (__vita__)
-	logstream = fopen(logfilename, "w");
+	logstream = I_OpenFile(logfilename, "w");
 #else/*defined (__unix__) || defined(__APPLE__) || defined (UNIXCOMMON)*/
-	logstream = fopen("latest-log.txt", "wt+");
+	logstream = I_OpenFile("latest-log.txt", "wt+");
 #endif/*defined (__unix__) || defined(__APPLE__) || defined (UNIXCOMMON)*/
 }
 #endif

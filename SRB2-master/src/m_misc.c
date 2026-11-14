@@ -42,6 +42,10 @@
 #include "d_main.h"
 #include "m_argv.h"
 #include "i_system.h"
+#include "i_output.h"
+#ifdef __vita__
+#include "vita/vita_paths.h"
+#endif
 #include "command.h" // cv_execversion
 
 #include "m_anigif.h"
@@ -247,7 +251,7 @@ boolean FIL_WriteFile(char const *name, const void *source, size_t length)
 	size_t count;
 
 	//if (FIL_WriteFileOK(name))
-		handle = fopen(name, "w+b");
+		handle = I_OpenFile(name, "w+b");
 
 	if (!handle)
 		return false;
@@ -315,11 +319,11 @@ boolean FIL_ConvertTextFileToBinary(const char *textfilename, const char *binfil
 	size_t count;
 	boolean success;
 
-	textfile = fopen(textfilename, "r");
+	textfile = I_OpenFile(textfilename, "r");
 	if (!textfile)
 		return false;
 
-	binfile = fopen(binfilename, "wb");
+	binfile = I_OpenFile(binfilename, "wb");
 	if (!binfile)
 	{
 		fclose(textfile);
@@ -585,12 +589,44 @@ void M_FirstLoadConfig(void)
 void M_SaveConfig(const char *filename)
 {
 	FILE *f;
+#ifdef __vita__
+	const char *requested = filename ? filename : configfile;
+	char filepath[MAX_WADPATH];
+	int length;
+#else
 	char *filepath;
+#endif
 
 	// make sure not to write back the config until it's been correctly loaded
 	if (!gameconfig_loaded)
 		return;
 
+#ifdef __vita__
+	if (!strstr(requested, ".cfg"))
+	{
+		CONS_Alert(CONS_NOTICE, M_GetText("Config filename must be .cfg\n"));
+		return;
+	}
+
+	if (requested[0] == '/' || strchr(requested, ':'))
+		length = snprintf(filepath, sizeof filepath, "%s", requested);
+	else
+		length = snprintf(filepath, sizeof filepath, pandf, srb2home, requested);
+
+	if (length < 0 || (size_t)length >= sizeof filepath || !VITA_PathIsWritable(filepath))
+	{
+		CONS_Alert(CONS_WARNING, "Config output must be inside ux0:data/srb2.\n");
+		return;
+	}
+
+	f = I_OpenFile(filepath, "w");
+	if (!f)
+	{
+		CONS_Alert(CONS_ERROR, M_GetText("Couldn't save game config file %s\n"), filepath);
+		return;
+	}
+	strcpy(configfile, filepath);
+#else
 	// can change the file name
 	if (filename)
 	{
@@ -607,7 +643,7 @@ void M_SaveConfig(const char *filename)
 		else
 			filepath = Z_StrDup(filename);
 
-		f = fopen(filepath, "w");
+		f = I_OpenFile(filepath, "w");
 		// change it only if valid
 		if (f)
 			strcpy(configfile, filepath);
@@ -625,13 +661,15 @@ void M_SaveConfig(const char *filename)
 			return;
 		}
 
-		f = fopen(configfile, "w");
+		f = I_OpenFile(configfile, "w");
 		if (!f)
 		{
 			CONS_Alert(CONS_ERROR, M_GetText("Couldn't save game config file %s\n"), configfile);
 			return;
 		}
 	}
+
+#endif
 
 	// header message
 	fprintf(f, "// SRB2 configuration file.\n");
@@ -1058,7 +1096,7 @@ static boolean M_SetupaPNG(png_const_charp filename, png_bytep pal)
 
 	downscale = apng_downscale ? vid.dup : 1;
 
-	apng_FILE = fopen(filename,"wb+"); // + mode for reading
+	apng_FILE = I_OpenFile(filename,"wb+"); // + mode for reading
 	if (!apng_FILE)
 	{
 		CONS_Debug(DBG_RENDER, "M_StartMovie: Error on opening %s for write\n", filename);
@@ -1071,7 +1109,7 @@ static boolean M_SetupaPNG(png_const_charp filename, png_bytep pal)
 	{
 		CONS_Debug(DBG_RENDER, "M_StartMovie: Error on initialize libpng\n");
 		fclose(apng_FILE);
-		remove(filename);
+		I_RemoveFile(filename);
 		return false;
 	}
 
@@ -1081,7 +1119,7 @@ static boolean M_SetupaPNG(png_const_charp filename, png_bytep pal)
 		CONS_Debug(DBG_RENDER, "M_StartMovie: Error on allocate for libpng\n");
 		png_destroy_write_struct(&apng_ptr,  NULL);
 		fclose(apng_FILE);
-		remove(filename);
+		I_RemoveFile(filename);
 		return false;
 	}
 
@@ -1091,7 +1129,7 @@ static boolean M_SetupaPNG(png_const_charp filename, png_bytep pal)
 		CONS_Debug(DBG_RENDER, "M_StartMovie: Error on allocate for apng\n");
 		png_destroy_write_struct(&apng_ptr, &apng_info_ptr);
 		fclose(apng_FILE);
-		remove(filename);
+		I_RemoveFile(filename);
 		return false;
 	}
 
@@ -1200,10 +1238,16 @@ void M_StartMovie(void)
 {
 #if NUMSCREENS > 2
 	char pathname[MAX_WADPATH];
+#ifdef __vita__
+	int fallback_output = 0;
+#endif
 
 	if (moviemode)
 		return;
 
+#ifdef __vita__
+	pathname[0] = '\0';
+#endif
 	if (cv_movie_option.value == 0)
 		strcpy(pathname, usehome ? srb2home : srb2path);
 	else if (cv_movie_option.value == 1)
@@ -1211,9 +1255,24 @@ void M_StartMovie(void)
 	else if (cv_movie_option.value == 2)
 		strcpy(pathname, srb2path);
 	else if (cv_movie_option.value == 3 && *cv_movie_folder.string != '\0')
+#ifdef __vita__
+		strlcpy(pathname, cv_movie_folder.string, sizeof(pathname));
+#else
 		strcpy(pathname, cv_movie_folder.string);
+#endif
 
-	if (cv_movie_option.value != 3)
+#ifdef __vita__
+	if (!VITA_PathIsWritable(pathname))
+	{
+		CONS_Alert(CONS_WARNING, "Output folder is outside ux0:data/srb2; using the default folder.\n");
+		strlcpy(pathname, VITA_OutputBase(pathname, srb2home, &fallback_output), sizeof(pathname));
+	}
+#endif
+	if (cv_movie_option.value != 3
+#ifdef __vita__
+		|| fallback_output
+#endif
+	)
 	{
 		strcat(pathname, PATHSEP"movies"PATHSEP);
 		I_mkdir(pathname, 0755);
@@ -1374,7 +1433,7 @@ boolean M_SavePNG(const char *filename, void *data, int width, int height, const
 #endif
 	png_FILE_p png_FILE;
 
-	png_FILE = fopen(filename,"wb");
+	png_FILE = I_OpenFile(filename,"wb");
 	if (!png_FILE)
 	{
 		CONS_Debug(DBG_RENDER, "M_SavePNG: Error on opening %s for write\n", filename);
@@ -1386,7 +1445,7 @@ boolean M_SavePNG(const char *filename, void *data, int width, int height, const
 	{
 		CONS_Debug(DBG_RENDER, "M_SavePNG: Error on initialize libpng\n");
 		fclose(png_FILE);
-		remove(filename);
+		I_RemoveFile(filename);
 		return false;
 	}
 
@@ -1396,7 +1455,7 @@ boolean M_SavePNG(const char *filename, void *data, int width, int height, const
 		CONS_Debug(DBG_RENDER, "M_SavePNG: Error on allocate for libpng\n");
 		png_destroy_write_struct(&png_ptr,  NULL);
 		fclose(png_FILE);
-		remove(filename);
+		I_RemoveFile(filename);
 		return false;
 	}
 
@@ -1409,7 +1468,7 @@ boolean M_SavePNG(const char *filename, void *data, int width, int height, const
 		//CONS_Debug(DBG_RENDER, "libpng write error on %s\n", filename);
 		png_destroy_write_struct(&png_ptr, &png_info_ptr);
 		fclose(png_FILE);
-		remove(filename);
+		I_RemoveFile(filename);
 		return false;
 	}
 #ifdef USE_FAR_KEYWORD
@@ -1553,6 +1612,9 @@ void M_DoScreenShot(void)
 #if NUMSCREENS > 2
 	const char *freename = NULL;
 	char pathname[MAX_WADPATH];
+#ifdef __vita__
+	int fallback_output = 0;
+#endif
 	boolean ret = false;
 	UINT8 *linear = NULL;
 
@@ -1563,6 +1625,9 @@ void M_DoScreenShot(void)
 	if (rendermode == render_none)
 		return;
 
+#ifdef __vita__
+	pathname[0] = '\0';
+#endif
 	if (cv_screenshot_option.value == 0)
 		strcpy(pathname, usehome ? srb2home : srb2path);
 	else if (cv_screenshot_option.value == 1)
@@ -1570,9 +1635,24 @@ void M_DoScreenShot(void)
 	else if (cv_screenshot_option.value == 2)
 		strcpy(pathname, srb2path);
 	else if (cv_screenshot_option.value == 3 && *cv_screenshot_folder.string != '\0')
+#ifdef __vita__
+		strlcpy(pathname, cv_screenshot_folder.string, sizeof(pathname));
+#else
 		strcpy(pathname, cv_screenshot_folder.string);
+#endif
 
-	if (cv_screenshot_option.value != 3)
+#ifdef __vita__
+	if (!VITA_PathIsWritable(pathname))
+	{
+		CONS_Alert(CONS_WARNING, "Output folder is outside ux0:data/srb2; using the default folder.\n");
+		strlcpy(pathname, VITA_OutputBase(pathname, srb2home, &fallback_output), sizeof(pathname));
+	}
+#endif
+	if (cv_screenshot_option.value != 3
+#ifdef __vita__
+		|| fallback_output
+#endif
+	)
 	{
 		strcat(pathname, PATHSEP"screenshots"PATHSEP);
 		I_mkdir(pathname, 0755);

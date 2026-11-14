@@ -30,6 +30,11 @@ static precise_t enterprecise, oldenterprecise;
 static fixed_t entertic, oldentertics;
 static double tictimer;
 
+static double I_PreciseElapsedSeconds(precise_t now, precise_t before, UINT64 frequency)
+{
+	return (double)(now - before) / frequency;
+}
+
 tic_t I_GetTime(void)
 {
 	return g_time.time;
@@ -63,7 +68,7 @@ void I_UpdateTime(fixed_t timescale)
 	ticratescaled = (double)TICRATE * FIXED_TO_FLOAT(timescale);
 
 	enterprecise = I_GetPreciseTime();
-	elapsedseconds = (double)(enterprecise - oldenterprecise) / I_GetPrecisePrecision();
+	elapsedseconds = I_PreciseElapsedSeconds(enterprecise, oldenterprecise, I_GetPrecisePrecision());
 	tictimer += elapsedseconds;
 	while (tictimer > 1.0/ticratescaled)
 	{

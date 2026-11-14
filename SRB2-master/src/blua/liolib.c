@@ -6,6 +6,7 @@
 
 
 #include <errno.h>
+#include "../i_output.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -274,7 +275,7 @@ static int io_openlocal (lua_State *L) {
 
 	// Open and return the file
 	pf = newfile(L);
-	*pf = fopen(realfilename, mode);
+	*pf = I_OpenFile(realfilename, mode);
 	return (*pf == NULL) ? pushresult(L, 0, filename) : 1;
 }
 
@@ -314,7 +315,7 @@ void Got_LuaFile(UINT8 **cp, INT32 playernum)
 			strcat(mode, "b");
 
 		pf = newfile(gL); // Create and push the file handle
-		*pf = fopen(luafiletransfers->realfilename, mode); // Open the file
+		*pf = I_OpenFile(luafiletransfers->realfilename, mode); // Open the file
 		if (!*pf)
 			I_Error("Can't open file \"%s\"\n", luafiletransfers->realfilename); // The file SHOULD exist
 	}
@@ -338,7 +339,7 @@ void Got_LuaFile(UINT8 **cp, INT32 playernum)
 		}
 
 		if (client)
-			remove(luafiletransfers->realfilename);
+			I_RemoveFile(luafiletransfers->realfilename);
 	}
 
 	RemoveLuaFileTransfer();
@@ -372,7 +373,7 @@ void RemoveLuaFileCallback(INT32 id)
 
 static int io_tmpfile (lua_State *L) {
   FILE **pf = newfile(L);
-  *pf = tmpfile();
+  *pf = I_TemporaryFile();
   return (*pf == NULL) ? pushresult(L, 0, NULL) : 1;
 }
 

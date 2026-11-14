@@ -1,6 +1,6 @@
 # Declare SDL2 interface sources
 
-target_sources(SRB2SDL2 PRIVATE
+set(SRB2_HOST_SDL_SOURCES
 	ogl_sdl.c
 	i_threads.c
 	i_net.c
@@ -11,6 +11,7 @@ target_sources(SRB2SDL2 PRIVATE
 	endtxt.c
 	hwsym_sdl.c
 )
+target_sources(SRB2SDL2 PRIVATE ${SRB2_HOST_SDL_SOURCES})
 
 # Compatibility flag with later versions of GCC
 # We should really fix our code to not need this

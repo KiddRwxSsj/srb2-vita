@@ -28,6 +28,7 @@
 #endif
 
 #include <signal.h>
+#include "../i_output.h"
 
 #ifdef _WIN32
 #define RPC_NO_WINDOWS_H
@@ -217,6 +218,9 @@ static char returnWadPath[256];
 #include "../i_video.h"
 #include "../i_sound.h"
 #include "../i_system.h"
+#ifdef __vita__
+#include "../vita/vita_paths.h"
+#endif
 #include "../i_threads.h"
 #include "../screen.h" //vid.WndParent
 #include "../netcode/d_net.h"
@@ -2458,7 +2462,7 @@ static void I_Fork(void)
 
 #ifdef LOGMESSAGES
 			/* By the way, exit closes files. */
-			logstream = fopen(logfilename, "at");
+			logstream = I_OpenFile(logfilename, "at");
 #else
 			logstream = 0;
 #endif
@@ -2765,7 +2769,7 @@ static void Shittylogcopy(void)
 	{
 		Shittycopyerror("fseek");
 	}
-	else if (( fp = fopen(logfilename, "wt") ))
+	else if (( fp = I_OpenFile(logfilename, "wt") ))
 	{
 		while (( r = fread(buf, 1, sizeof buf, logstream) ))
 		{
@@ -2898,6 +2902,12 @@ char *I_GetUserName(void)
 
 INT32 I_mkdir(const char *dirname, INT32 unixright)
 {
+#ifdef __vita__
+	char output[1024];
+	if (!VITA_ResolveOutput(output, sizeof output, dirname))
+		return -1;
+	dirname = output;
+#endif
 //[segabor]
 #if defined (__unix__) || defined(__APPLE__) || defined (UNIXCOMMON) || defined (__CYGWIN__) || defined (__vita__)
 	return mkdir(dirname, unixright);
@@ -2935,8 +2945,8 @@ size_t I_GetRandomBytes(char *destination, size_t count)
 	FILE *rndsource;
 	size_t actual_bytes = 0;
 
-	if (!(rndsource = fopen("/dev/urandom", "r")))
-		if (!(rndsource = fopen("/dev/random", "r")))
+	if (!(rndsource = I_OpenFile("/dev/urandom", "r")))
+		if (!(rndsource = I_OpenFile("/dev/random", "r")))
 			actual_bytes = 0;
 
 	if (rndsource)

@@ -81,6 +81,7 @@
 // Lump and patch caches are shared with the level geometry worker, which
 // builds wall textures while the game thread caches sprite patches
 #include "vita/vita_rthread.h"
+#include "vita/vita_framelog.h"
 size_t W_ReadLumpHeaderPwadUnlocked(UINT16 wad, UINT16 lump, void *dest, size_t size, size_t offset);
 void *W_CacheLumpNumPwadUnlocked(UINT16 wad, UINT16 lump, INT32 tag);
 void *W_CachePatchNumPwadUnlocked(UINT16 wad, UINT16 lump, INT32 tag);
@@ -1939,6 +1940,34 @@ UINT8 W_LumpExists(const char *name)
 	return false;
 }
 
+static FILE *W_OpenFolderLump(lumpinfo_t *l, const char *caller)
+{
+	INT32 stat = pathisdirectory(l->diskpath);
+	FILE *handle;
+
+	if (stat < 0)
+	{
+#ifndef AVOID_ERRNO
+		if (direrror == ENOENT)
+			I_Error("%s: file %s doesn't exist", caller, l->diskpath);
+		else
+			I_Error("%s: could not stat %s: %s", caller, l->diskpath, strerror(direrror));
+#else
+		I_Error("%s: could not access %s", caller, l->diskpath);
+#endif
+	}
+	if (stat == 1)
+		return NULL;
+
+	handle = fopen(l->diskpath, "rb");
+	if (handle == NULL)
+		I_Error("%s: could not open file %s", caller, l->diskpath);
+
+	fseek(handle, 0, SEEK_END);
+	l->size = l->disksize = ftell(handle);
+	return handle;
+}
+
 size_t W_LumpLengthPwad(UINT16 wad, UINT16 lump)
 {
 	lumpinfo_t *l;
@@ -1948,36 +1977,12 @@ size_t W_LumpLengthPwad(UINT16 wad, UINT16 lump)
 
 	l = wadfiles[wad]->lumpinfo + lump;
 
-	// Open the external file for this lump, if the WAD is a folder.
 	if (wadfiles[wad]->type == RET_FOLDER)
 	{
-		// pathisdirectory calls stat, so if anything wrong has happened,
-		// this is the time to be aware of it.
-		INT32 stat = pathisdirectory(l->diskpath);
-
-		if (stat < 0)
-		{
-#ifndef AVOID_ERRNO
-			if (direrror == ENOENT)
-				I_Error("W_LumpLengthPwad: file %s doesn't exist", l->diskpath);
-			else
-				I_Error("W_LumpLengthPwad: could not stat %s: %s", l->diskpath, strerror(direrror));
-#else
-			I_Error("W_LumpLengthPwad: could not access %s", l->diskpath);
-#endif
-		}
-		else if (stat == 1) // Path is a folder.
+		FILE *handle = W_OpenFolderLump(l, "W_LumpLengthPwad");
+		if (handle == NULL)
 			return 0;
-		else
-		{
-			FILE *handle = fopen(l->diskpath, "rb");
-			if (handle == NULL)
-				I_Error("W_LumpLengthPwad: could not open file %s", l->diskpath);
-
-			fseek(handle, 0, SEEK_END);
-			l->size = l->disksize = ftell(handle);
-			fclose(handle);
-		}
+		fclose(handle);
 	}
 
 	return l->size;
@@ -2058,6 +2063,39 @@ void zerr(int ret)
 #define Picture_ThrowPNGError(lumpname, wadfilename) I_Error("W_Wad: Lump \"%s\" in file \"%s\" is a .png - please convert to either Doom or Flat (raw) image format.", lumpname, wadfilename)
 #endif
 
+#if defined (__vita__) && defined (HAVE_ZLIB)
+static size_t W_ReadDeflatePrefix(FILE *handle, UINT16 wad, UINT16 lump, void *dest, size_t size, unsigned long rawSize)
+{
+	z_stream strm;
+	int zErr;
+
+	UINT8 chunk[2048];
+
+	memset(&strm, 0, sizeof strm);
+	if (inflateInit2(&strm, -15) != Z_OK)
+		return 0;
+
+	strm.next_out = dest;
+	strm.avail_out = size;
+	zErr = Z_OK;
+
+	while (strm.avail_out && rawSize && zErr == Z_OK)
+	{
+		size_t n = min(rawSize, sizeof chunk);
+		if (fread(chunk, 1, n, handle) < n)
+			I_Error("wad %d, lump %d: cannot read compressed data", wad, lump);
+		rawSize -= n;
+		strm.next_in = chunk;
+		strm.avail_in = n;
+		zErr = inflate(&strm, Z_SYNC_FLUSH);
+	}
+
+	size -= strm.avail_out;
+	(void)inflateEnd(&strm);
+	return size;
+}
+#endif
+
 /** Reads bytes from the head of a lump.
   * Note: If the lump is compressed, the whole thing has to be read anyway.
   *
@@ -2084,36 +2122,11 @@ size_t W_ReadLumpHeaderPwad(UINT16 wad, UINT16 lump, void *dest, size_t size, si
 
 	l = wadfiles[wad]->lumpinfo + lump;
 
-	// Open the external file for this lump, if the WAD is a folder.
 	if (wadfiles[wad]->type == RET_FOLDER)
 	{
-		// pathisdirectory calls stat, so if anything wrong has happened,
-		// this is the time to be aware of it.
-		INT32 stat = pathisdirectory(l->diskpath);
-
-		if (stat < 0)
-		{
-#ifndef AVOID_ERRNO
-			if (direrror == ENOENT)
-				I_Error("W_ReadLumpHeaderPwad: file %s doesn't exist", l->diskpath);
-			else
-				I_Error("W_ReadLumpHeaderPwad: could not stat %s: %s", l->diskpath, strerror(direrror));
-#else
-			I_Error("W_ReadLumpHeaderPwad: could not access %s", l->diskpath);
-#endif
-		}
-		else if (stat == 1) // Path is a folder.
+		handle = W_OpenFolderLump(l, "W_ReadLumpHeaderPwad");
+		if (handle == NULL)
 			return 0;
-		else
-		{
-			handle = fopen(l->diskpath, "rb");
-			if (handle == NULL)
-				I_Error("W_ReadLumpHeaderPwad: could not open file %s", l->diskpath);
-
-			// Find length of file
-			fseek(handle, 0, SEEK_END);
-			l->size = l->disksize = ftell(handle);
-		}
 	}
 
 	lumpsize = wadfiles[wad]->lumpinfo[lump].size;
@@ -2199,32 +2212,7 @@ size_t W_ReadLumpHeaderPwad(UINT16 wad, UINT16 lump, void *dest, size_t size, si
 			// Patch/flat/sprite size probes at startup only want the first few
 			// bytes; inflating every lump in full made booting take minutes.
 			if (!offset && size < decSize)
-			{
-				UINT8 chunk[2048];
-
-				memset(&strm, 0, sizeof strm);
-				if (inflateInit2(&strm, -15) != Z_OK)
-					return 0;
-
-				strm.next_out = dest;
-				strm.avail_out = size;
-				zErr = Z_OK;
-
-				while (strm.avail_out && rawSize && zErr == Z_OK)
-				{
-					size_t n = min(rawSize, sizeof chunk);
-					if (fread(chunk, 1, n, handle) < n)
-						I_Error("wad %d, lump %d: cannot read compressed data", wad, lump);
-					rawSize -= n;
-					strm.next_in = chunk;
-					strm.avail_in = n;
-					zErr = inflate(&strm, Z_SYNC_FLUSH);
-				}
-
-				size -= strm.avail_out;
-				(void)inflateEnd(&strm);
-				return size;
-			}
+				return W_ReadDeflatePrefix(handle, wad, lump, dest, size, rawSize);
 #endif
 
 			rawData = Z_Malloc(rawSize, PU_STATIC, NULL);
@@ -3121,8 +3109,11 @@ virtlump_t* vres_Find(const virtres_t* vres, const char* name)
 size_t W_ReadLumpHeaderPwad(UINT16 wad, UINT16 lump, void *dest, size_t size, size_t offset)
 {
 	size_t read;
+	UINT64 start;
 	VITA_ZoneLock();
+	start = VITA_FrameClock();
 	read = W_ReadLumpHeaderPwadUnlocked(wad, lump, dest, size, offset);
+	VITA_FrameCountRead(read, (UINT32)(VITA_FrameClock() - start));
 	VITA_ZoneUnlock();
 	return read;
 }
