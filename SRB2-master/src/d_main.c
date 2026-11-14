@@ -77,6 +77,9 @@
 #include "m_perfstats.h"
 #include "m_random.h"
 #include "command.h"
+#ifdef SRB2_REWRITE_DIAGNOSTICS
+#include "rewrite/diagnostics_console.h"
+#endif
 
 #ifdef CMAKECONFIG
 #include "config.h"
@@ -100,6 +103,8 @@
 
 #ifdef __vita__
 #include "vita/vita_debug.h"
+#include "vita/vita_framelog.h"
+#include "vita/vita_bench.h"
 #endif
 
 // Version numbers for netplay :upside_down_face:
@@ -813,6 +818,12 @@ static void D_RunFrame(void)
 		precise_t capbudget;
 		precise_t enterprecise = I_GetPreciseTime();
 		precise_t finishprecise = enterprecise;
+#ifdef __vita__
+		UINT32 frametics = 0;
+
+		VITA_FrameBegin();
+		VITA_BenchFrame();
+#endif
 
 		{
 			// Casting the return value of a function is bad practice (apparently)
@@ -863,6 +874,10 @@ static void D_RunFrame(void)
 
 			// process tics (but maybe not if realtic == 0)
 			TryRunTics(realtics);
+#ifdef __vita__
+			frametics = realtics;
+			VITA_FramePhase(VFL_TICS);
+#endif
 
 			if (lastdraw || singletics || gametic > rendergametic)
 			{
@@ -924,7 +939,14 @@ static void D_RunFrame(void)
 
 		if (interp || doDisplay)
 		{
+#ifdef __vita__
+			VITA_FramePhase(VFL_OTHER);
+#endif
 			D_Display();
+#ifdef __vita__
+			VITA_FrameRenderStats();
+			VITA_FramePhase(VFL_DISPLAY);
+#endif
 		}
 
 		// Only take screenshots after drawing.
@@ -962,6 +984,9 @@ static void D_RunFrame(void)
 		finishprecise = I_GetPreciseTime();
 		deltasecs = (double)((INT64)(finishprecise - enterprecise)) / I_GetPrecisePrecision();
 		deltatics = deltasecs * NEWTICRATE;
+#ifdef __vita__
+		VITA_FrameEnd(frametics);
+#endif
 	}
 	return;
 }
@@ -1432,6 +1457,9 @@ void D_SRB2Main(void)
 
 	// Do this up here so that WADs loaded through the command line can use ExecCfg
 	COM_Init();
+#ifdef SRB2_REWRITE_DIAGNOSTICS
+	RewriteDiagnostics_ConsoleInit();
+#endif
 
 	COM_AddCommand("assert", Command_assert, COM_LUA);
 
@@ -1684,6 +1712,10 @@ void D_SRB2Main(void)
 	else
 		COM_ImmedExecute(va("exec \"%s"PATHSEP"autoexec.cfg\" -noerror\n", srb2home));
 
+#ifdef __vita__
+	VITA_BenchInit();
+#endif
+
 	if (!autostart)
 		M_PushSpecialParameters(); // push all "+" parameters at the command buffer
 
@@ -1802,7 +1834,11 @@ void D_SRB2Main(void)
 			}
 		}
 	}
+#ifdef __vita__
+	else if (M_CheckParm("-skipintro") || VITA_BenchActive())
+#else
 	else if (M_CheckParm("-skipintro"))
+#endif
 	{
 		F_InitMenuPresValues();
 		F_StartTitleScreen();
@@ -1823,6 +1859,10 @@ void D_SRB2Main(void)
 
 const char *D_Home(void)
 {
+#ifdef __vita__
+	usehome = true;
+	return "ux0:data";
+#else
 	const char *userhome = NULL;
 
 #ifdef ANDROID
@@ -1866,6 +1906,7 @@ const char *D_Home(void)
 #endif// _WIN32
 	if (usehome) return userhome;
 	else return NULL;
+#endif
 }
 
 static boolean check_top_dir(const char **path, const char *top)
