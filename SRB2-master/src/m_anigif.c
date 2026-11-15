@@ -14,6 +14,7 @@
 ///        which by-the-way: the patents have expired for over ten years ago.
 
 #include "m_anigif.h"
+#include "i_output.h"
 #include "d_main.h"
 #include "z_zone.h"
 #include "v_video.h"
@@ -727,7 +728,7 @@ static void GIF_framewrite(void)
 //
 INT32 GIF_open(const char *filename)
 {
-	gif_out = fopen(filename, "wb");
+	gif_out = I_OpenFile(filename, "wb");
 	if (!gif_out)
 		return 0;
 

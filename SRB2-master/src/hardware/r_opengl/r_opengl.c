@@ -20,6 +20,7 @@
 #endif
 
 #include <stdarg.h>
+#include "../../i_output.h"
 #include <math.h>
 #include "../../r_local.h" // For rendertimefrac, used for the leveltime shader uniform
 #include "r_opengl.h"
@@ -96,6 +97,7 @@ static GLint min_filter = GL_LINEAR;
 static GLint mag_filter = GL_LINEAR;
 static GLint anisotropic_filter = 0;
 static boolean model_lighting = false;
+static boolean fullvisibility_projection = false;
 boolean supportMipMap = false;
 
 const GLubyte *gl_version = NULL;
@@ -203,13 +205,14 @@ FUNCPRINTF void GL_DBG_Printf(const char *format, ...)
 	va_list arglist;
 
 	if (!gllogstream)
-		gllogstream = fopen("ogllog.txt", "w");
+		gllogstream = I_OpenFile("ogllog.txt", "w");
 
 	va_start(arglist, format);
 	vsnprintf(str, 4096, format, arglist);
 	va_end(arglist);
 
-	fwrite(str, strlen(str), 1, gllogstream);
+	if (gllogstream)
+		fwrite(str, strlen(str), 1, gllogstream);
 #else
 	(void)format;
 #endif
@@ -233,8 +236,9 @@ FUNCPRINTF static void GL_MSG_Warning(const char *format, ...)
 #endif
 #ifdef DEBUG_TO_FILE
 	if (!gllogstream)
-		gllogstream = fopen("ogllog.txt", "w");
-	fwrite(str, strlen(str), 1, gllogstream);
+		gllogstream = I_OpenFile("ogllog.txt", "w");
+	if (gllogstream)
+		fwrite(str, strlen(str), 1, gllogstream);
 #endif
 }
 
@@ -256,8 +260,9 @@ FUNCPRINTF static void GL_MSG_Error(const char *format, ...)
 #endif
 #ifdef DEBUG_TO_FILE
 	if (!gllogstream)
-		gllogstream = fopen("ogllog.txt", "w");
-	fwrite(str, strlen(str), 1, gllogstream);
+		gllogstream = I_OpenFile("ogllog.txt", "w");
+	if (gllogstream)
+		fwrite(str, strlen(str), 1, gllogstream);
 #endif
 }
 
@@ -1002,8 +1007,16 @@ static void GLPerspective(GLfloat fovy, GLfloat aspect)
 
 	m[0][0] = cotangent / aspect;
 	m[1][1] = cotangent;
-	m[2][2] = -(zFar + zNear) / deltaZ;
-	m[3][2] = -2.0f * zNear * zFar / deltaZ;
+	if (fullvisibility_projection)
+	{
+		m[2][2] = -1.0f;
+		m[3][2] = -2.0f * zNear;
+	}
+	else
+	{
+		m[2][2] = -(zFar + zNear) / deltaZ;
+		m[3][2] = -2.0f * zNear * zFar / deltaZ;
+	}
 
 	pglMultMatrixf(&m[0][0]);
 }
@@ -2318,6 +2331,53 @@ static void PreparePolygon(FSurfaceInfo *pSurf, FOutVector *pOutVerts, FBITFIELD
 	Shader_SetUniforms(pSurf, &poly, &tint, &fade);
 }
 
+typedef struct
+{
+	GLfloat x, y, z, w, s, t;
+} gl_horizonvertex_t;
+
+static void GL_PackHorizonVertices(gl_horizonvertex_t *dest, const FOutVector *source, FUINT num)
+{
+	FUINT i;
+	const FUINT grouped = num - num % 6;
+	for (i = 0; i < grouped; i += 6)
+	{
+		FUINT j;
+		for (j = 0; j < 6; j++)
+		{
+			dest[i + j].x = source[i + j].x;
+			dest[i + j].y = source[i + j].y;
+			dest[i + j].z = source[i + j].z;
+			dest[i + j].w = j < 4 ? 1.0f : 0.0f;
+			dest[i + j].s = source[i + j].s;
+			dest[i + j].t = source[i + j].t;
+		}
+	}
+	for (; i < num; i++)
+	{
+		dest[i].x = source[i].x;
+		dest[i].y = source[i].y;
+		dest[i].z = source[i].z;
+		dest[i].w = i % 6 < 4 ? 1.0f : 0.0f;
+		dest[i].s = source[i].s;
+		dest[i].t = source[i].t;
+	}
+}
+
+#ifndef __vita__
+static gl_horizonvertex_t *GL_HorizonVertices(const FOutVector *source, FUINT num)
+{
+	gl_horizonvertex_t *vertices;
+	if (!num || num % 6 || num > SIZE_MAX / sizeof *vertices)
+		I_Error("Invalid projective horizon vertex count");
+	vertices = malloc(num * sizeof *vertices);
+	if (!vertices)
+		I_Error("Out of memory packing projective horizon vertices");
+	GL_PackHorizonVertices(vertices, source, num);
+	return vertices;
+}
+#endif
+
 #ifdef __vita__
 // Vertex and index data go straight into vitaGL's per-frame scratch pool and
 // are bound through buffer objects. With client arrays vitaGL scans the
@@ -2325,11 +2385,19 @@ static void PreparePolygon(FSurfaceInfo *pSurf, FOutVector *pOutVerts, FBITFIELD
 // attribute stream on every draw.
 static GLuint vglStreamVBO = 0, vglStreamIBO = 0;
 
-static void VGL_StreamVerts(FOutVector *verts, FUINT num)
+static void VGL_StreamVerts(FOutVector *verts, FUINT num, FBITFIELD flags)
 {
-	void *mem = vglAllocFromScratch(num * sizeof (FOutVector));
+	boolean horizon = (flags & PF_HorizonInfinity) != 0;
+	size_t stride = horizon ? sizeof(gl_horizonvertex_t) : sizeof(FOutVector);
+	void *mem;
 
-	memcpy(mem, verts, num * sizeof (FOutVector));
+	if (horizon && (!num || num % 6 || num > SIZE_MAX / stride))
+		I_Error("Invalid projective horizon vertex count");
+	mem = vglAllocFromScratch(num * stride);
+	if (horizon)
+		GL_PackHorizonVertices(mem, verts, num);
+	else
+		memcpy(mem, verts, num * stride);
 	if (!vglStreamVBO)
 	{
 		pglGenBuffers(1, &vglStreamVBO);
@@ -2337,8 +2405,8 @@ static void VGL_StreamVerts(FOutVector *verts, FUINT num)
 	}
 	pglBindBuffer(GL_ARRAY_BUFFER, vglStreamVBO);
 	vglBufferData(GL_ARRAY_BUFFER, mem);
-	pglVertexPointer(3, GL_FLOAT, sizeof(FOutVector), (void *)offsetof(FOutVector, x));
-	pglTexCoordPointer(2, GL_FLOAT, sizeof(FOutVector), (void *)offsetof(FOutVector, s));
+	pglVertexPointer(horizon ? 4 : 3, GL_FLOAT, stride, (void *)offsetof(FOutVector, x));
+	pglTexCoordPointer(2, GL_FLOAT, stride, (void *)(horizon ? offsetof(gl_horizonvertex_t, s) : offsetof(FOutVector, s)));
 	pglBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 #endif
@@ -2348,15 +2416,31 @@ static void VGL_StreamVerts(FOutVector *verts, FUINT num)
 // -----------------+
 EXPORT void HWRAPI(DrawPolygon) (FSurfaceInfo *pSurf, FOutVector *pOutVerts, FUINT iNumPts, FBITFIELD PolyFlags)
 {
+#ifndef __vita__
+	gl_horizonvertex_t *horizon = NULL;
+#endif
 	PreparePolygon(pSurf, pOutVerts, PolyFlags);
 
 #ifdef __vita__
-	VGL_StreamVerts(pOutVerts, iNumPts);
+	VGL_StreamVerts(pOutVerts, iNumPts, PolyFlags);
 #else
-	pglVertexPointer(3, GL_FLOAT, sizeof(FOutVector), &pOutVerts[0].x);
-	pglTexCoordPointer(2, GL_FLOAT, sizeof(FOutVector), &pOutVerts[0].s);
+	if (PolyFlags & PF_HorizonInfinity)
+	{
+		horizon = GL_HorizonVertices(pOutVerts, iNumPts);
+		pglVertexPointer(4, GL_FLOAT, sizeof *horizon, &horizon[0].x);
+		pglTexCoordPointer(2, GL_FLOAT, sizeof *horizon, &horizon[0].s);
+	}
+	else
+	{
+		pglVertexPointer(3, GL_FLOAT, sizeof(FOutVector), &pOutVerts[0].x);
+		pglTexCoordPointer(2, GL_FLOAT, sizeof(FOutVector), &pOutVerts[0].s);
+	}
 #endif
 	pglDrawArrays(PolyFlags & PF_WireFrame ? GL_LINES : GL_TRIANGLE_FAN, 0, iNumPts);
+
+#ifndef __vita__
+	free(horizon);
+#endif
 
 	if (PolyFlags & PF_RemoveYWrap)
 		pglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -2383,17 +2467,33 @@ EXPORT void HWRAPI(DrawIndexedTriangles) (FSurfaceInfo *pSurf, FOutVector *pOutV
 		if (IndexArray[i] > top)
 			top = IndexArray[i];
 	}
-	VGL_StreamVerts(pOutVerts, top + 1);
+	VGL_StreamVerts(pOutVerts, top + 1, PolyFlags);
 	pglBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vglStreamIBO);
 	vglBufferData(GL_ELEMENT_ARRAY_BUFFER, idx);
 	pglDrawElements(GL_TRIANGLES, iNumPts, GL_UNSIGNED_INT, NULL);
 	pglBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 #else
+	gl_horizonvertex_t *horizon = NULL;
 	PreparePolygon(pSurf, pOutVerts, PolyFlags);
 
-	pglVertexPointer(3, GL_FLOAT, sizeof(FOutVector), &pOutVerts[0].x);
-	pglTexCoordPointer(2, GL_FLOAT, sizeof(FOutVector), &pOutVerts[0].s);
+	if (PolyFlags & PF_HorizonInfinity)
+	{
+		UINT32 top = 0;
+		FUINT i;
+		for (i = 0; i < iNumPts; i++)
+			if (IndexArray[i] > top)
+				top = IndexArray[i];
+		horizon = GL_HorizonVertices(pOutVerts, top + 1);
+		pglVertexPointer(4, GL_FLOAT, sizeof *horizon, &horizon[0].x);
+		pglTexCoordPointer(2, GL_FLOAT, sizeof *horizon, &horizon[0].s);
+	}
+	else
+	{
+		pglVertexPointer(3, GL_FLOAT, sizeof(FOutVector), &pOutVerts[0].x);
+		pglTexCoordPointer(2, GL_FLOAT, sizeof(FOutVector), &pOutVerts[0].s);
+	}
 	pglDrawElements(GL_TRIANGLES, iNumPts, GL_UNSIGNED_INT, IndexArray);
+	free(horizon);
 #endif
 
 	// the DrawPolygon variant of this has some code about polyflags and wrapping here but havent noticed any problems from omitting it?
@@ -2497,6 +2597,9 @@ EXPORT void HWRAPI(SetSpecialState) (hwdspecialstate_t IdState, INT32 Value)
 {
 	switch (IdState)
 	{
+		case HWD_SET_FULLVISIBILITY:
+			fullvisibility_projection = (Value != 0);
+			break;
 		case HWD_SET_MODEL_LIGHTING:
 			model_lighting = Value;
 			break;

@@ -434,7 +434,10 @@ void gld_FrustrumSetup(void)
 	frustum[4][1] = clip[ 7] - clip[ 6];
 	frustum[4][2] = clip[11] - clip[10];
 	frustum[4][3] = clip[15] - clip[14];
-	NORMALIZE_PLANE(4);
+	if (frustum[4][0] || frustum[4][1] || frustum[4][2])
+	{
+		NORMALIZE_PLANE(4);
+	}
 
 	// Near plane
 	frustum[5][0] = clip[ 3] + clip[ 2];

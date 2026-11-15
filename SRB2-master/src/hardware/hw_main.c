@@ -670,6 +670,10 @@ static void HWR_RenderPlane(subsector_t *subsector, extrasubsector_t *xsub, bool
 	{
 		// Horizon lines
 		FOutVector horizonpts[6];
+		pslope_t *horizonSlope = slope;
+		const boolean horizonInfinity = cv_fullvisibility.value != 0;
+		boolean horizonReady = false;
+		float horizonHeight = height, horizonDX = 0.0f, horizonDZ = 0.0f;
 		float dist, vx, vy;
 		float x1, y1, xd, yd;
 		UINT8 numplanes, j;
@@ -684,6 +688,17 @@ static void HWR_RenderPlane(subsector_t *subsector, extrasubsector_t *xsub, bool
 		{
 			if (!line->glseg && line->linedef->special == SPECIAL_HORIZON_LINE && R_PointOnSegSide(viewx, viewy, line) == 0)
 			{
+				if (horizonInfinity && !horizonReady)
+				{
+					if (slope)
+					{
+						horizonHeight = FixedToFloat(P_GetSlopeZAt(slope, viewx, viewy));
+						horizonDX = FixedToFloat(slope->d.x) * FixedToFloat(slope->zdelta);
+						horizonDZ = FixedToFloat(slope->d.y) * FixedToFloat(slope->zdelta);
+					}
+					slope = NULL;
+					horizonReady = true;
+				}
 				P_ClosestPointOnLine(viewx, viewy, line->linedef, &v);
 				dist = FIXED_TO_FLOAT(R_PointToDist(v.x, v.y));
 
@@ -741,18 +756,37 @@ static void HWR_RenderPlane(subsector_t *subsector, extrasubsector_t *xsub, bool
 					vx = (horizonpts[0].x - gl_viewx) * farrenderdist / renderdist + gl_viewx;
 					vy = (horizonpts[0].z - gl_viewy) * farrenderdist / renderdist + gl_viewy;
 					SETUP3DVERT((&horizonpts[5]), vx, vy);
-					horizonpts[5].y = gl_viewz;
+					if (!horizonInfinity)
+						horizonpts[5].y = gl_viewz;
 
 					vx = (horizonpts[3].x - gl_viewx) * farrenderdist / renderdist + gl_viewx;
 					vy = (horizonpts[3].z - gl_viewy) * farrenderdist / renderdist + gl_viewy;
 					SETUP3DVERT((&horizonpts[4]), vx, vy);
-					horizonpts[4].y = gl_viewz;
+					if (!horizonInfinity)
+						horizonpts[4].y = gl_viewz;
 
 					// Draw
-					HWR_ProcessPolygon(&Surf, horizonpts, 6, PolyFlags, shader, true);
+					if (horizonInfinity)
+					{
+						UINT8 k;
+						for (k = 0; k < 4; k++)
+							horizonpts[k].y = horizonHeight
+								+ (horizonpts[k].x - gl_viewx) * horizonDX
+								+ (horizonpts[k].z - gl_viewy) * horizonDZ;
+						for (k = 4; k < 6; k++)
+						{
+							horizonpts[k].x -= gl_viewx;
+							horizonpts[k].z -= gl_viewy;
+							horizonpts[k].y = horizonpts[k].x * horizonDX + horizonpts[k].z * horizonDZ;
+						}
+						HWR_ProcessPolygon(&Surf, horizonpts, 6, PolyFlags|PF_HorizonInfinity, shader, true);
+					}
+					else
+						HWR_ProcessPolygon(&Surf, horizonpts, 6, PolyFlags, shader, true);
 				}
 			}
 		}
+		slope = horizonSlope;
 	}
 
 #ifdef ALAM_LIGHTING
@@ -2031,6 +2065,8 @@ static void HWR_ProcessSeg(void)
 // The walk uses its own copies of the globals the wall code reads (hwwalk,
 // swapped in with macros around the walk functions).
 
+#include "../vita/vita_geometry_queue.h"
+
 boolean vita_pgen_enabled = true;
 
 enum
@@ -2064,18 +2100,8 @@ static hwjob_t hwinlinejob;
 static SceUID hwgenthread = -1, hwgenstart = -1;
 static sector_t hwsectorcopies[HWSECTORCOPIES];
 
-// Written by the game thread, polled by the worker
-static struct
-{
-	UINT32 head, open;
-} VITA_LINE hwqueue;
-
-// Written by the worker
-static struct
-{
-	UINT32 tail, finished;
-	precise_t busy;
-} VITA_LINE hwworker;
+static hwgen_queue_t hwqueue;
+static hwgen_worker_t hwworker;
 
 #define hwjobhead hwqueue.head
 #define hwjobsopen hwqueue.open
@@ -2129,7 +2155,7 @@ static int HWR_GenThread(SceSize args, void *argp)
 		sceKernelWaitSema(hwgenstart, 1, NULL);
 		for (;;)
 		{
-			head = __atomic_load_n(&hwjobhead, __ATOMIC_ACQUIRE);
+			head = HWR_QueueHead(&hwqueue);
 			if (tail != head)
 			{
 				precise_t t = I_GetPreciseTime();
@@ -2137,11 +2163,11 @@ static int HWR_GenThread(SceSize args, void *argp)
 					HWR_RunJob(&hwjobs[tail++ & (HWJOBCOUNT - 1)]);
 				while (tail != head);
 				hwdbgbusy += I_GetPreciseTime() - t;
-				__atomic_store_n(&hwjobtail, tail, __ATOMIC_RELEASE);
+				HWR_WorkerPublishTail(&hwworker, tail);
 			}
 			// The game thread publishes its last job before closing
-			else if (!__atomic_load_n(&hwjobsopen, __ATOMIC_ACQUIRE)
-				&& __atomic_load_n(&hwjobhead, __ATOMIC_ACQUIRE) == tail)
+			else if (!HWR_QueueIsOpen(&hwqueue)
+				&& HWR_QueueHead(&hwqueue) == tail)
 				break;
 			else
 			{
@@ -2152,7 +2178,7 @@ static int HWR_GenThread(SceSize args, void *argp)
 					__asm__ volatile("nop");
 			}
 		}
-		__atomic_store_n(&hwgenfinished, 1, __ATOMIC_RELEASE);
+		HWR_WorkerComplete(&hwworker);
 	}
 	return 0;
 }
@@ -2179,7 +2205,7 @@ static boolean HWR_StartGenThread(void)
 static void HWR_PublishJobs(void)
 {
 	if (hwqueue.head != hwwalk.head)
-		__atomic_store_n(&hwqueue.head, hwwalk.head, __ATOMIC_RELEASE);
+		HWR_QueuePublish(&hwqueue, hwwalk.head);
 }
 
 // Waits until the worker has run every job handed to it so far
@@ -2188,7 +2214,7 @@ static void HWR_GenSync(void)
 	if (!hwgenactive)
 		return;
 	HWR_PublishJobs();
-	while (__atomic_load_n(&hwjobtail, __ATOMIC_ACQUIRE) != hwwalk.head)
+	while (HWR_WorkerTail(&hwworker) != hwwalk.head)
 		;
 }
 
@@ -2211,8 +2237,8 @@ static void HWR_GenClose(void)
 {
 	if (!hwgenopen)
 		return;
-	__atomic_store_n(&hwjobsopen, 0, __ATOMIC_RELEASE);
-	while (!__atomic_load_n(&hwgenfinished, __ATOMIC_ACQUIRE))
+	HWR_QueueClose(&hwqueue);
+	while (!HWR_WorkerFinished(&hwworker))
 		;
 	hwgenopen = false;
 
@@ -2262,7 +2288,7 @@ static hwjob_t *HWR_NewJob(UINT8 type)
 		if (!hwwalk.freejobs)
 		{
 			HWR_PublishJobs();
-			while ((hwwalk.freejobs = HWJOBCOUNT - (hwwalk.head - __atomic_load_n(&hwjobtail, __ATOMIC_ACQUIRE))) == 0)
+			while ((hwwalk.freejobs = HWJOBCOUNT - (hwwalk.head - HWR_WorkerTail(&hwworker))) == 0)
 				;
 		}
 		j = &hwjobs[hwwalk.head & (HWJOBCOUNT - 1)];
@@ -3598,6 +3624,16 @@ fixed_t *hwbbox;
 #ifdef __vita__
 // Open areas see most of the map, so the walk visits nearly every node.
 // gr_farclip drops subtrees whose box is farther than that from the view.
+static INT64 HWR_EffectiveFarClipSquared(INT32 distance, boolean fullvisibility)
+{
+	return fullvisibility ? 0 : (INT64)distance * distance;
+}
+
+static boolean HWR_ShouldApplyFarFog(INT32 distance, boolean fog, boolean fullvisibility)
+{
+	return !fullvisibility && distance && fog;
+}
+
 static boolean HWR_BeyondFarClip(fixed_t *bspcoord)
 {
 	INT64 dx = 0, dy = 0;
@@ -5394,7 +5430,7 @@ static void HWR_AddSprites(sector_t *sec)
 	hoop_limit_dist = (fixed_t)(cv_drawdist_nights.value) << FRACBITS;
 	for (thing = sec->thinglist; thing; thing = thing->snext)
 	{
-		if (R_ThingWithinDist(thing, limit_dist, hoop_limit_dist))
+		if (cv_fullvisibility.value || R_ThingWithinDist(thing, limit_dist, hoop_limit_dist))
 		{
 			if (R_ThingVisible(thing))
 			{
@@ -5930,6 +5966,8 @@ static void HWR_ProjectPrecipitationSprite(precipmobj_t *thing)
 
 	if (!thing)
 		return;
+
+	P_PrecipCatchUp(thing);
 
 	// Visibility check by the blend mode.
 	if (thing->frame & FF_TRANSMASK)
@@ -6747,6 +6785,7 @@ void HWR_RenderPlayerView(INT32 viewnumber, player_t *player)
 #ifdef __vita__
 	vita_dbg_in3d = true;
 #endif
+	HWD.pfnSetSpecialState(HWD_SET_FULLVISIBILITY, cv_fullvisibility.value);
 
 #ifdef __vita__
 	HWR_GenOpen();
@@ -6823,7 +6862,7 @@ void HWR_RenderPlayerView(INT32 viewnumber, player_t *player)
 		HWR_StartBatching();
 
 #ifdef __vita__
-	gl_farclipsq = (INT64)cv_glfarclip.value * cv_glfarclip.value;
+	gl_farclipsq = HWR_EffectiveFarClipSquared(cv_glfarclip.value, cv_fullvisibility.value);
 #endif
 #ifdef __vita__
 	HWR_GenBegin();
@@ -6878,7 +6917,7 @@ void HWR_RenderPlayerView(INT32 viewnumber, player_t *player)
 
 	// The far clip cuts by 2D distance, fog goes by depth: at the screen's
 	// edge the cut is 0.7 of the way out, so the fog ends there
-	if (cv_glfarclip.value && cv_glfarfog.value)
+	if (HWR_ShouldApplyFarFog(cv_glfarclip.value, cv_glfarfog.value, cv_fullvisibility.value))
 	{
 		HWR_UpdateFogColor();
 		HWD.pfnSetSpecialState(HWD_SET_FOG_COLOR, (INT32)gl_fogcolor.rgba);
@@ -6932,7 +6971,7 @@ void HWR_RenderPlayerView(INT32 viewnumber, player_t *player)
 
 #ifdef __vita__
 	vita_dbg_in3d = false;
-	if (cv_glfarclip.value && cv_glfarfog.value)
+	if (HWR_ShouldApplyFarFog(cv_glfarclip.value, cv_glfarfog.value, cv_fullvisibility.value))
 		HWD.pfnSetSpecialState(HWD_SET_FOG, 0);
 #endif
 

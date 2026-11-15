@@ -133,6 +133,11 @@ static const char *VITA_DebugValue(INT32 item, INT32 *color)
 				*color = V_REDMAP;
 			return vita_pgen_enabled ? "On" : "Off";
 		case DBG_FOG:
+			if (cv_fullvisibility.value)
+			{
+				*color = V_GRAYMAP;
+				return "Bypassed";
+			}
 			if (!cv_glfarclip.value)
 				*color = V_GRAYMAP;
 			else if (!cv_glfarfog.value)
@@ -143,6 +148,11 @@ static const char *VITA_DebugValue(INT32 item, INT32 *color)
 				*color = V_REDMAP;
 			return cv_glculling.string;
 		case DBG_FARCLIP:
+			if (cv_fullvisibility.value)
+			{
+				*color = V_GRAYMAP;
+				return "Bypassed";
+			}
 			if (!cv_glfarclip.value)
 				*color = V_GRAYMAP;
 			else

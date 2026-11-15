@@ -28,63 +28,8 @@
 #include "../hardware/r_opengl/r_opengl.h"
 #include "vita_debug.h"
 #include "vita_rthread.h"
-
-#define RT_NULL ((size_t)-1)
-
-enum
-{
-	RT_SETTEXTURE,
-	RT_DRAWPOLYGON,
-	RT_DRAWINDEXED,
-	RT_SKYDOME,
-	RT_SETBLEND,
-	RT_CLEARBUFFER,
-	RT_GCLIPRECT,
-	RT_SPECIALSTATE,
-	RT_SETTRANSFORM,
-	RT_DRAW2DLINE,
-	RT_POSTIMGREDRAW,
-	RT_FLUSHSCREENTEX,
-	RT_SCREENWIPE,
-	RT_DRAWSCREENTEX,
-	RT_MAKESCREENTEX,
-	RT_DRAWSCREENFINAL,
-	RT_SETSHADER,
-	RT_UNSETSHADER,
-	RT_SHADERINFO,
-	RT_BATCHES,
-	RT_UPLOAD,
-	RT_PRESENT
-};
-
-typedef struct
-{
-	UINT32 op;
-	union
-	{
-		UINT32 texname;
-		INT32 value;
-		FBITFIELD flags;
-		gl_sky_t *sky;
-		size_t data;
-		struct { size_t surf, verts, indices; FUINT num; FBITFIELD flags; } poly;
-		struct { FBOOLEAN color, depth; size_t rgba; } clear;
-		struct { INT32 minx, miny, maxx, maxy; float nearclip; } clip;
-		struct { INT32 id, value; } state;
-		struct { size_t coords; RGBA_t color; } line;
-		struct { INT32 a, b, c; size_t surf; FBITFIELD flags; } screen;
-		struct { size_t polys, verts; INT32 num; } batch;
-		struct { size_t tex, data; } upload;
-	} u;
-} rtcmd_t;
-
-typedef struct
-{
-	rtcmd_t *cmds;
-	size_t numcmds, maxcmds;
-	UINT8 *data;
-	size_t used, size;
-} rtbuf_t;
+#include "vita_framelog.h"
+#include "vita_render_commands.h"
 
 boolean vita_rt_enabled = true;
 
@@ -109,54 +54,12 @@ static size_t rtvertsize = 0, rtindexsize = 0;
 
 static rtcmd_t *RT_Cmd(UINT32 op)
 {
-	rtbuf_t *b = &rtbufs[rtcur];
-
-	if (b->numcmds == b->maxcmds)
-	{
-		b->maxcmds = b->maxcmds ? b->maxcmds * 2 : 4096;
-		b->cmds = realloc(b->cmds, b->maxcmds * sizeof (rtcmd_t));
-		if (!b->cmds)
-			I_Error("Out of memory for render commands");
-	}
-	b->cmds[b->numcmds].op = op;
-	return &b->cmds[b->numcmds++];
-}
-
-// Data is referenced by offset, so the arena can grow while a frame is recorded
-static size_t RT_Alloc(size_t len)
-{
-	rtbuf_t *b = &rtbufs[rtcur];
-	size_t off;
-
-	off = (b->used + 7) & ~(size_t)7;
-	if (off + len > b->size)
-	{
-		size_t newsize = b->size ? b->size : 512 * 1024;
-		while (off + len > newsize)
-			newsize *= 2;
-		b->data = realloc(b->data, newsize);
-		if (!b->data)
-			I_Error("Out of memory for render data");
-		b->size = newsize;
-	}
-	b->used = off + len;
-	return off;
+	return RT_BufferCommand(&rtbufs[rtcur], op);
 }
 
 static size_t RT_Copy(const void *src, size_t len)
 {
-	size_t off;
-
-	if (!src)
-		return RT_NULL;
-	off = RT_Alloc(len);
-	memcpy(rtbufs[rtcur].data + off, src, len);
-	return off;
-}
-
-static void *RT_Ptr(rtbuf_t *b, size_t off)
-{
-	return (off == RT_NULL) ? NULL : b->data + off;
+	return RT_BufferCopy(&rtbufs[rtcur], src, len);
 }
 
 static void RT_BindTexture(UINT32 name)
@@ -236,9 +139,10 @@ static void RT_DrawBatches(rtbuf_t *b, rtcmd_t *c)
 		if (i + 1 < num)
 		{
 			next = &polys[rtsort[i + 1]];
-			if (next->hash == p->hash
+			if (!((next->polyFlags ^ curflags) & PF_HorizonInfinity)
+				&& (next->hash == p->hash
 				|| (RT_POLYTEX(next) == curtex && next->polyFlags == curflags
-				&& next->surf.PolyColor.rgba == cursurf.PolyColor.rgba))
+				&& next->surf.PolyColor.rgba == cursurf.PolyColor.rgba)))
 				continue;
 		}
 
@@ -369,8 +273,12 @@ static int RT_Thread(SceSize args, void *argp)
 
 	for (;;)
 	{
+		UINT64 start;
+
 		sceKernelWaitSema(rtwork, 1, NULL);
+		start = VITA_FrameClock();
 		RT_Replay(rtsubmitted);
+		VITA_FrameCountRender((UINT32)(VITA_FrameClock() - start));
 		sceKernelSignalSema(rtdone, 1);
 	}
 	return 0;
@@ -472,6 +380,7 @@ static boolean RT_RecordUpload(GLMipmap_t *tex)
 	copy->flags |= TF_VITAFRESH;
 	VGL_TrackTexture(tex);
 	RT_Cmd(RT_SETTEXTURE)->u.texname = tex->downloaded;
+	VITA_FrameCountUpload(size);
 	return true;
 }
 
@@ -486,6 +395,8 @@ static void RT_SetTexture(GLMipmap_t *tex)
 		return;
 	// An upload writes the new GL name back into the mipmap, and the game
 	// reads it right away (batching sorts on it)
+	if (tex && !tex->downloaded)
+		VITA_FrameCountUpload((size_t)tex->width * tex->height * RT_TexelSize(tex->format));
 	RT_DIRECT(rtreal.pfnSetTexture(tex));
 }
 
@@ -858,7 +769,13 @@ void VITA_ZoneLock(void)
 		sceKernelCreateLwMutex(&zonelock, "srb2_zone", SCE_KERNEL_MUTEX_ATTR_RECURSIVE, 0, NULL);
 		zonelockready = true;
 	}
-	sceKernelLockLwMutex(&zonelock, 1, NULL);
+	if (sceKernelTryLockLwMutex(&zonelock, 1) < 0)
+	{
+		UINT64 start = VITA_FrameClock();
+
+		sceKernelLockLwMutex(&zonelock, 1, NULL);
+		VITA_FrameCountZoneWait((UINT32)(VITA_FrameClock() - start));
+	}
 }
 
 void VITA_ZoneUnlock(void)
@@ -934,7 +851,12 @@ void VITA_RT_FinishUpdate(INT32 waitvbl)
 	}
 
 	RT_Cmd(RT_PRESENT)->u.value = waitvbl;
-	sceKernelWaitSema(rtdone, 1, NULL);
+	{
+		UINT64 start = VITA_FrameClock();
+
+		sceKernelWaitSema(rtdone, 1, NULL);
+		VITA_FrameCountPresentWait((UINT32)(VITA_FrameClock() - start));
+	}
 	RT_Submit();
 
 	if (!vita_rt_enabled)

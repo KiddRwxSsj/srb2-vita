@@ -218,6 +218,14 @@ static const INT32 vitaButtonMap[] =
 };
 #define NUMVITABUTTONS ((INT32)(sizeof (vitaButtonMap) / sizeof (vitaButtonMap[0])))
 
+static INT32 VID_JoyButtonKey(UINT8 button, boolean second)
+{
+	const INT32 mapped = vitaButtonMap[button];
+	if (mapped < 0)
+		return (second ? KEY_2HAT1 : KEY_HAT1) + (-mapped - 1);
+	return (second ? KEY_2JOY1 : KEY_JOY1) + mapped;
+}
+
 static INT32 VID_JoyAxis(Sint16 axis, evtype_t which)
 {
 	// -32768 to 32767
@@ -297,7 +305,6 @@ static void Impl_HandleJoystickButtonEvent(SDL_JoyButtonEvent evt, Uint32 type)
 {
 	event_t event;
 	SDL_JoystickID joyid[2];
-	INT32 mapped;
 	boolean second;
 
 	joyid[0] = SDL_JoystickInstanceID(JoyInfo.dev);
@@ -320,11 +327,7 @@ static void Impl_HandleJoystickButtonEvent(SDL_JoyButtonEvent evt, Uint32 type)
 	if (evt.button >= NUMVITABUTTONS)
 		return;
 
-	mapped = vitaButtonMap[evt.button];
-	if (mapped < 0)
-		event.key = (second ? KEY_2HAT1 : KEY_HAT1) + (-mapped - 1);
-	else
-		event.key = (second ? KEY_2JOY1 : KEY_JOY1) + mapped;
+	event.key = VID_JoyButtonKey(evt.button, second);
 
 	D_PostEvent(&event);
 }

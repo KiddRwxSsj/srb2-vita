@@ -232,6 +232,7 @@ enum EPolyFlags
 	PF_ForceWrapX       = 0x00020000,   // Forces repeat texture on X
 	PF_ForceWrapY       = 0x00040000,   // Forces repeat texture on Y
 	PF_Ripple           = 0x00100000,   // Water ripple effect. The current backend doesn't use it for anything.
+	PF_HorizonInfinity  = 0x00400000,
 	PF_WireFrame        = 0x00200000,   // Draws vertices as lines instead of triangles
 };
 
@@ -295,7 +296,9 @@ enum hwdsetspecialstate
 #ifdef __vita__
 	HWD_SET_FOG, // fully fogged at this distance, 0 = off
 	HWD_SET_FOG_COLOR, // RGBA_t.rgba
+
 #endif
+	HWD_SET_FULLVISIBILITY,
 	HWD_NUMSTATE
 };
 

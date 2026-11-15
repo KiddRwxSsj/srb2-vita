@@ -26,6 +26,7 @@
 #include "r_things.h"
 #include "r_skins.h"
 #include "p_local.h"
+#include "perf_count.h"
 #include "dehacked.h" // get_number (for thok)
 #include "m_cond.h"
 #ifdef HWRENDER
@@ -478,7 +479,7 @@ static void SetSkin(player_t *player, INT32 skinnum)
 		if (newcolor)
 			player->mo->color = newcolor;
 		P_SetScale(player->mo, player->mo->scale, false);
-		player->mo->radius = radius;
+		PC_WRITE(player->mo, radius, radius);
 
 		P_SetMobjState(player->mo, player->mo->state-states); // Prevent visual errors when switching between skins with differing number of frames
 	}

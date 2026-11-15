@@ -366,7 +366,8 @@ void HWR_RenderBatches(void)
 		{
 			// check if a state change is required, set the change bools and next vars
 			int nextIndex = polygonIndexArray[polygonReadPos];
-			if (polygonArray[index].hash != polygonArray[nextIndex].hash)
+			if (polygonArray[index].hash != polygonArray[nextIndex].hash
+				|| ((polygonArray[index].polyFlags ^ polygonArray[nextIndex].polyFlags) & PF_HorizonInfinity))
 			{
 				nextShader = polygonArray[nextIndex].shader;
 				nextTexture = polygonArray[nextIndex].texture;

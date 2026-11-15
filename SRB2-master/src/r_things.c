@@ -2595,6 +2595,8 @@ static void R_ProjectPrecipitationSprite(precipmobj_t *thing)
 	// uncapped/interpolation
 	interpmobjstate_t interp = {0};
 
+	P_PrecipCatchUp(thing);
+
 	// do interpolation
 	if (R_UsingFrameInterpolation() && !paused)
 	{
@@ -2795,7 +2797,7 @@ void R_AddSprites(sector_t *sec, INT32 lightlevel)
 	hoop_limit_dist = (fixed_t)(cv_drawdist_nights.value) << FRACBITS;
 	for (thing = sec->thinglist; thing; thing = thing->snext)
 	{
-		if (R_ThingWithinDist(thing, limit_dist, hoop_limit_dist))
+		if (cv_fullvisibility.value || R_ThingWithinDist(thing, limit_dist, hoop_limit_dist))
 		{
 			const INT32 oldobjectsdrawn = objectsdrawn;
 
@@ -3792,6 +3794,9 @@ boolean R_PrecipThingVisible (precipmobj_t *precipthing,
 
 	if (( precipthing->precipflags & PCF_INVISIBLE ))
 		return false;
+
+	if (cv_fullvisibility.value)
+		return true;
 
 	approx_dist = P_AproxDistance(viewx-precipthing->x, viewy-precipthing->y);
 
