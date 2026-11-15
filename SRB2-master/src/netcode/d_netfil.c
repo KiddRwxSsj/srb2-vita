@@ -12,6 +12,7 @@
 
 #ifdef HAVE_CURL
 #include <curl/curl.h>
+#include "../i_output.h"
 #endif
 
 #include <stdio.h>
@@ -349,7 +350,7 @@ void CL_AbortDownloadResume(void)
 		return;
 
 	free(pauseddownload->receivedfragments);
-	remove(pauseddownload->filename);
+	I_RemoveFile(pauseddownload->filename);
 	free(pauseddownload);
 	pauseddownload = NULL;
 }
@@ -723,7 +724,7 @@ void RemoveLuaFileTransfer(void)
 
 	// If it was a temporary file, delete it
 	if (server && !strchr(filetransfer->mode, 'b'))
-		remove(filetransfer->realfilename);
+		I_RemoveFile(filetransfer->realfilename);
 
 	RemoveLuaFileCallback(filetransfer->id);
 
@@ -1059,7 +1060,7 @@ void FileSendTicker(void)
 				long filesize;
 
 				transfer[i].currentfile =
-					fopen(f->id.filename, "rb");
+					I_OpenFile(f->id.filename, "rb");
 
 				if (!transfer[i].currentfile)
 					I_Error("File %s does not exist",
@@ -1297,7 +1298,7 @@ void FileReceiveTicker(void)
 
 static void OpenNewFileForDownload(fileneeded_t *file, const char *filename)
 {
-	file->file = fopen(filename, "wb");
+	file->file = I_OpenFile(filename, "wb");
 	if (!file->file)
 		I_Error("Can't create file %s: %s", filename, strerror(errno));
 
@@ -1374,7 +1375,7 @@ void PT_FileFragment(SINT8 node, INT32 netconsole)
 
 		if (CL_CanResumeDownload(file))
 		{
-			file->file = fopen(file->filename, "r+b");
+			file->file = I_OpenFile(file->filename, "r+b");
 			if (!file->file)
 			{
 				CONS_Alert(CONS_ERROR, "Couldn't reopen file %s: %s\n", file->filename, strerror(errno));
@@ -1546,7 +1547,7 @@ void CloseNetFile(void)
 				{
 					// File is not complete, delete it.
 					free(fileneeded[i].receivedfragments);
-					remove(fileneeded[i].filename);
+					I_RemoveFile(fileneeded[i].filename);
 				}
 			}
 	}
@@ -1690,7 +1691,7 @@ boolean CURLPrepareFile(const char* url, int dfilenum)
 		CONS_Printf("Downloading addon \"%s\" from %s\n", curl_realname, url);
 
 		strcatbf(curl_curfile->filename, downloaddir, "/");
-		curl_curfile->file = fopen(curl_curfile->filename, "wb");
+		curl_curfile->file = I_OpenFile(curl_curfile->filename, "wb");
 
 		cc = curl_easy_setopt(http_handle, CURLOPT_WRITEDATA, curl_curfile->file);
 		if (cc != CURLE_OK) I_OutputMsg("libcurl: %s\n", curl_errbuf);
@@ -1807,7 +1808,7 @@ void CURLGetFile(void)
 					curl_curfile->totalsize = curl_origtotalfilesize;
 					filedownload.http_failed = true;
 					fclose(curl_curfile->file);
-					remove(curl_curfile->filename);
+					I_RemoveFile(curl_curfile->filename);
 					CONS_Alert(CONS_ERROR, M_GetText("Failed to download addon \"%s\" (%s)\n"), filename, easy_handle_error);
 				}
 				else
@@ -1925,7 +1926,7 @@ filestatus_t checkfilemd5(char *filename, const UINT8 *wantedmd5sum)
 	if (!wantedmd5sum)
 		return FS_FOUND;
 
-	fhandle = fopen(filename, "rb");
+	fhandle = I_OpenFile(filename, "rb");
 	if (fhandle)
 	{
 		md5_stream(fhandle,md5sum);

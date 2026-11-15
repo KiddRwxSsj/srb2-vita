@@ -11,6 +11,7 @@
 /// \brief Various netgame commands, such as kick and ban
 
 #include "commands.h"
+#include "../i_output.h"
 #include "d_clisrv.h"
 #include "client_connection.h"
 #include "net_command.h"
@@ -89,7 +90,7 @@ void Ban_Load_File(boolean warning)
 
 	bans_loaded = true;
 
-	f = fopen(va("%s"PATHSEP"%s", srb2home, "ban.txt"), "r");
+	f = I_OpenFile(va("%s"PATHSEP"%s", srb2home, "ban.txt"), "r");
 
 	if (!f)
 	{
@@ -136,11 +137,11 @@ void D_SaveBan(void)
 
 	if (!reasonhead)
 	{
-		remove(path);
+		I_RemoveFile(path);
 		return;
 	}
 
-	f = fopen(path, "w");
+	f = I_OpenFile(path, "w");
 
 	if (!f)
 	{

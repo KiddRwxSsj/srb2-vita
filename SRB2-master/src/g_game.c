@@ -12,6 +12,7 @@
 /// \brief game loop functions, events handling
 
 #include "doomdef.h"
+#include "i_output.h"
 #include "console.h"
 #include "d_main.h"
 #include "d_player.h"
@@ -608,7 +609,7 @@ static void G_SetMainRecords(gamedata_t *data, player_t *player)
 			if (!FIL_FileExists(bestdemo) || G_CmpDemoTime(bestdemo, lastdemo) & 1)
 			{ // Better time, save this demo.
 				if (FIL_FileExists(bestdemo))
-					remove(bestdemo);
+					I_RemoveFile(bestdemo);
 				FIL_WriteFile(bestdemo, buf, len);
 				CONS_Printf("\x83%s\x80 %s '%s'\n", M_GetText("NEW RECORD TIME!"), M_GetText("Saved replay as"), bestdemo);
 			}
@@ -617,7 +618,7 @@ static void G_SetMainRecords(gamedata_t *data, player_t *player)
 			if (!FIL_FileExists(bestdemo) || (G_CmpDemoTime(bestdemo, lastdemo) & (1<<1)))
 			{ // Better score, save this demo.
 				if (FIL_FileExists(bestdemo))
-					remove(bestdemo);
+					I_RemoveFile(bestdemo);
 				FIL_WriteFile(bestdemo, buf, len);
 				CONS_Printf("\x83%s\x80 %s '%s'\n", M_GetText("NEW HIGH SCORE!"), M_GetText("Saved replay as"), bestdemo);
 			}
@@ -626,7 +627,7 @@ static void G_SetMainRecords(gamedata_t *data, player_t *player)
 			if (!FIL_FileExists(bestdemo) || (G_CmpDemoTime(bestdemo, lastdemo) & (1<<2)))
 			{ // Better rings, save this demo.
 				if (FIL_FileExists(bestdemo))
-					remove(bestdemo);
+					I_RemoveFile(bestdemo);
 				FIL_WriteFile(bestdemo, buf, len);
 				CONS_Printf("\x83%s\x80 %s '%s'\n", M_GetText("NEW MOST RINGS!"), M_GetText("Saved replay as"), bestdemo);
 			}
@@ -746,7 +747,7 @@ static void G_SetNightsRecords(gamedata_t *data, player_t *player)
 			if (!FIL_FileExists(bestdemo) || G_CmpDemoTime(bestdemo, lastdemo) & 1)
 			{ // Better time, save this demo.
 				if (FIL_FileExists(bestdemo))
-					remove(bestdemo);
+					I_RemoveFile(bestdemo);
 				FIL_WriteFile(bestdemo, buf, len);
 				CONS_Printf("\x83%s\x80 %s '%s'\n", M_GetText("NEW RECORD TIME!"), M_GetText("Saved replay as"), bestdemo);
 			}
@@ -755,7 +756,7 @@ static void G_SetNightsRecords(gamedata_t *data, player_t *player)
 			if (!FIL_FileExists(bestdemo) || (G_CmpDemoTime(bestdemo, lastdemo) & (1<<1)))
 			{ // Better score, save this demo.
 				if (FIL_FileExists(bestdemo))
-					remove(bestdemo);
+					I_RemoveFile(bestdemo);
 				FIL_WriteFile(bestdemo, buf, len);
 				CONS_Printf("\x83%s\x80 %s '%s'\n", M_GetText("NEW HIGH SCORE!"), M_GetText("Saved replay as"), bestdemo);
 			}
@@ -4002,7 +4003,7 @@ static void G_HandleSaveLevel(void)
 			{
 				// don't keep a backup around when the run is done!
 				if (FIL_FileExists(liveeventbackup))
-					remove(liveeventbackup);
+					I_RemoveFile(liveeventbackup);
 				cursaveslot = 0;
 			}
 			else if (!usedCheats && !(netgame || multiplayer || ultimatemode || demorecording || metalrecording || modeattacking))

@@ -18,6 +18,7 @@
 
 #include "r_local.h"
 #include "p_local.h"
+#include "perf_count.h"
 #include "p_setup.h"
 #include "netcode/d_net.h"
 
@@ -779,8 +780,8 @@ void Command_CauseCfail_f(void)
 		}
 		if (redflag)
 		{
-			redflag->x = 423423;
-			redflag->y = 666;
+			PC_WRITE(redflag, x, 423423);
+			PC_WRITE(redflag, y, 666);
 			redflag->z = 123311;
 		}
 	}

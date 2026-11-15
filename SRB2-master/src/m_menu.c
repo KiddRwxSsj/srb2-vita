@@ -19,6 +19,7 @@
 #include "m_menu.h"
 
 #include "doomdef.h"
+#include "i_output.h"
 #include "d_main.h"
 #include "netcode/d_netcmd.h"
 #include "console.h"
@@ -8985,7 +8986,7 @@ static void M_SaveGameDeleteResponse(INT32 ch)
 	// delete savegame
 	snprintf(name, sizeof name, savegamename, saveSlotSelected);
 	name[sizeof name - 1] = '\0';
-	remove(name);
+	I_RemoveFile(name);
 
 	BwehHehHe();
 	M_ReadSaveStrings(); // reload the menu
@@ -10435,7 +10436,7 @@ static void M_ChooseNightsAttack(INT32 choice)
 	snprintf(nameofdemo, sizeof nameofdemo, "%s-%s-last", gpath, skins[cv_chooseskin.value-1]->name);
 
 	if (!cv_autorecord.value)
-		remove(va("%s"PATHSEP"%s.lmp", srb2home, nameofdemo));
+		I_RemoveFile(va("%s"PATHSEP"%s.lmp", srb2home, nameofdemo));
 	else
 		G_RecordDemo(nameofdemo);
 
@@ -10464,7 +10465,7 @@ static void M_ChooseTimeAttack(INT32 choice)
 	snprintf(nameofdemo, sizeof nameofdemo, "%s-%s-last", gpath, skins[cv_chooseskin.value-1]->name);
 
 	if (!cv_autorecord.value)
-		remove(va("%s"PATHSEP"%s.lmp", srb2home, nameofdemo));
+		I_RemoveFile(va("%s"PATHSEP"%s.lmp", srb2home, nameofdemo));
 	else
 		G_RecordDemo(nameofdemo);
 
@@ -10612,7 +10613,7 @@ static void M_EraseGuest(INT32 choice)
 	if (choice == 'y' || choice == KEY_ENTER)
 	{
 		if (FIL_FileExists(rguest))
-			remove(rguest);
+			I_RemoveFile(rguest);
 	}
 	M_SetupNextMenu(currentMenu->prevMenu->prevMenu);
 	Nextmap_OnChange();
@@ -10631,7 +10632,7 @@ static void M_OverwriteGuest(const char *which)
 	}
 	if (FIL_FileExists(rguest)) {
 		M_StopMessage(0);
-		remove(rguest);
+		I_RemoveFile(rguest);
 	}
 	FIL_WriteFile(rguest, buf, len);
 	Z_Free(rguest);
@@ -10755,7 +10756,7 @@ static void M_MarathonLiveEventBackup(INT32 choice)
 	if (choice == KEY_DEL)
 	{
 		if (FIL_FileExists(liveeventbackup)) // just in case someone deleted it while we weren't looking.
-			remove(liveeventbackup);
+			I_RemoveFile(liveeventbackup);
 		BwehHehHe();
 		M_StartMessage("Live event backup erased.\n",M_Marathon,MM_NOTHING);
 		return;

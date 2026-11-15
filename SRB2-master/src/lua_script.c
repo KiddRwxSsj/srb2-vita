@@ -11,6 +11,7 @@
 /// \brief Lua scripting basics
 
 #include "doomdef.h"
+#include "i_output.h"
 #include "fastcmp.h"
 #include "dehacked.h"
 #include "deh_lua.h"
@@ -734,7 +735,7 @@ void LUA_DumpFile(const char *filename)
 	char filenamebuf[MAX_WADPATH];
 
 	if (!gL) // Lua needs to be initialized
-		LUA_ClearState(false);
+		LUA_ClearState();
 
 	// find the file the SRB2 way
 	strncpy(filenamebuf, filename, MAX_WADPATH);
@@ -773,8 +774,13 @@ void LUA_DumpFile(const char *filename)
 	}
 
 	// dump it back to disk
-	if ((handle = fopen(filename, "wb")) == NULL)
+	if ((handle = I_OpenFile(filename, "wb")) == NULL)
+	{
 		CONS_Alert(CONS_ERROR, M_GetText("Can't write to %s\n"), filename);
+		lua_pop(gL, 1);
+		lua_gc(gL, LUA_GCCOLLECT, 0);
+		return;
+	}
 	if (lua_dump(gL, dumpWriter, handle))
 		CONS_Printf("Failed while writing %s to disk... Sorry!\n", filename);
 	else

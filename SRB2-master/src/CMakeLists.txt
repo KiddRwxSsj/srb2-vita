@@ -1,110 +1,32 @@
 include(clang-tidy-default)
 
+include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/SRB2CoreSources.cmake")
+
 add_executable(SRB2SDL2 MACOSX_BUNDLE WIN32
-	comptime.c
-	md5.c
+	${SRB2_SHARED_CORE_BASE}
+	${SRB2_SHARED_CORE_LUA}
 	config.h.in
-	string.c
-	d_main.c
-	dehacked.c
-	deh_soc.c
-	deh_lua.c
-	deh_tables.c
-	z_zone.c
-	f_finale.c
-	f_wipe.c
-	g_demo.c
-	g_game.c
-	g_input.c
-	am_map.c
-	command.c
-	console.c
-	hu_stuff.c
-	i_time.c
-	y_inter.c
-	st_stuff.c
-	m_aatree.c
-	m_anigif.c
-	m_argv.c
-	m_bbox.c
-	m_cheat.c
-	m_cond.c
-	m_easing.c
-	m_fixed.c
-	m_menu.c
-	m_misc.c
-	m_perfstats.c
-	m_random.c
-	m_tokenizer.c
-	m_queue.c
-	m_vector.c
-	info.c
-	p_ceilng.c
-	p_enemy.c
-	p_floor.c
-	p_inter.c
-	p_lights.c
-	p_map.c
-	p_maputl.c
-	p_mobj.c
-	p_polyobj.c
-	p_saveg.c
-	p_setup.c
-	p_sight.c
-	p_spec.c
-	p_telept.c
-	p_tick.c
-	p_user.c
-	p_slopes.c
-	tables.c
-	r_bsp.c
-	r_data.c
-	r_draw.c
-	r_fps.c
-	r_main.c
-	r_plane.c
-	r_segs.c
-	r_skins.c
-	r_sky.c
-	r_splats.c
-	r_things.c
-	r_bbox.c
-	r_textures.c
-	r_translation.c
-	r_patch.c
-	r_patchrotation.c
-	r_picformats.c
-	r_portal.c
-	screen.c
-	taglist.c
-	v_video.c
-	s_sound.c
-	sounds.c
-	w_wad.c
-	filesrch.c
-	lzf.c
-	b_bot.c
-	u_list.c
-	snake.c
-	lua_script.c
-	lua_baselib.c
-	lua_mathlib.c
-	lua_hooklib.c
-	lua_consolelib.c
-	lua_infolib.c
-	lua_mobjlib.c
-	lua_playerlib.c
-	lua_skinlib.c
-	lua_thinkerlib.c
-	lua_maplib.c
-	lua_taglib.c
-	lua_polyobjlib.c
-	lua_blockmaplib.c
-	lua_hudlib.c
-	lua_hudlib_drawlist.c
-	lua_colorlib.c
-	lua_inputlib.c
 )
+
+option(SRB2_REWRITE_DIAGNOSTICS "Enable rewrite diagnostics" OFF)
+if(SRB2_REWRITE_DIAGNOSTICS)
+	target_sources(SRB2SDL2 PRIVATE rewrite/diagnostics.c rewrite/diagnostics_console.c)
+	target_compile_definitions(SRB2SDL2 PRIVATE SRB2_REWRITE_DIAGNOSTICS)
+endif()
+
+option(SRB2_PERF_VERIFY "Enable host performance shadow verification" OFF)
+option(SRB2_PERF_COUNT "Count strict collision-query reuse without bypassing queries" OFF)
+if(SRB2_PERF_COUNT)
+	target_sources(SRB2SDL2 PRIVATE perf_count.c)
+	target_compile_definitions(SRB2SDL2 PRIVATE SRB2_PERF_COUNT)
+endif()
+if(SRB2_PERF_VERIFY)
+	if(CMAKE_CROSSCOMPILING)
+		message(FATAL_ERROR "SRB2_PERF_VERIFY is host-only")
+	endif()
+	target_sources(SRB2SDL2 PRIVATE perf_verify.c)
+	target_compile_definitions(SRB2SDL2 PRIVATE SRB2_PERF_VERIFY)
+endif()
 
 # This updates the modification time for comptime.c at the
 # end of building so when the build system is ran next time,

@@ -31,6 +31,7 @@
 #include "../y_inter.h"
 #include "../z_zone.h"
 #include "../doomtype.h"
+#include "../i_output.h"
 #include "../doomstat.h"
 #if defined (__GNUC__) || defined (__unix__)
 #include <unistd.h>
@@ -1229,7 +1230,7 @@ void CL_ConnectToServer(void)
 	cl_mode = CL_SEARCHING;
 
 	// Don't get a corrupt savegame error because tmpsave already exists
-	if (FIL_FileExists(tmpsave) && unlink(tmpsave) == -1)
+	if (FIL_FileExists(tmpsave) && I_UnlinkFile(tmpsave) == -1)
 		I_Error("Can't delete %s\n", tmpsave);
 
 	if (netgame)

@@ -22,6 +22,7 @@
 #include "../d_main.h"
 #include "../doomstat.h"
 #include "../doomtype.h"
+#include "../i_output.h"
 #include "../f_finale.h"
 #include "../g_demo.h"
 #include "../g_game.h"
@@ -209,7 +210,7 @@ void CL_LoadReceivedSavegame(boolean reloading)
 
 	// done
 	Z_Free(savebuffer.buf);
-	if (unlink(tmpsave) == -1)
+	if (I_UnlinkFile(tmpsave) == -1)
 		CONS_Alert(CONS_ERROR, M_GetText("Can't delete %s\n"), tmpsave);
 	consistancy[gametic%BACKUPTICS] = Consistancy();
 	CON_ToggleOff();
@@ -315,7 +316,7 @@ void PT_WillResendGamestate(SINT8 node)
 	sprintf(tmpsave, "%s" PATHSEP TMPSAVENAME, srb2home);
 
 	// Don't get a corrupt savegame error because tmpsave already exists
-	if (FIL_FileExists(tmpsave) && unlink(tmpsave) == -1)
+	if (FIL_FileExists(tmpsave) && I_UnlinkFile(tmpsave) == -1)
 		I_Error("Can't delete %s\n", tmpsave);
 
 	CL_PrepareDownloadSaveGame(tmpsave);

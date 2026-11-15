@@ -12,6 +12,7 @@
 /// \brief Demo recording and playback
 
 #include "doomdef.h"
+#include "i_output.h"
 #include "console.h"
 #include "d_main.h"
 #include "d_player.h"
@@ -2849,7 +2850,7 @@ static void G_StopTimingDemo(void)
 		else if (sizeof(void*) == 8)
 			procbits = 64;
 
-		f = fopen(csvpath, "a+");
+		f = I_OpenFile(csvpath, "a+");
 
 		if (f)
 		{

@@ -17,6 +17,7 @@
 ///        The NOTHING packet is sent when connection is idle to acknowledge packets
 
 #include "../doomdef.h"
+#include "../i_output.h"
 #include "../g_game.h"
 #include "../i_time.h"
 #include "i_net.h"
@@ -1264,7 +1265,7 @@ boolean D_CheckNetGame(void)
 		{
 			k++;
 			sprintf(filename, "debug%d.txt", k);
-			debugfile = fopen(va("%s" PATHSEP "%s", srb2home, filename), "w");
+			debugfile = I_OpenFile(va("%s" PATHSEP "%s", srb2home, filename), "w");
 		}
 		if (debugfile)
 			CONS_Printf(M_GetText("debug output to: %s\n"), va("%s" PATHSEP "%s", srb2home, filename));

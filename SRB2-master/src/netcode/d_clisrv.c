@@ -46,6 +46,9 @@
 #include "../lua_libs.h"
 #include "../md5.h"
 #include "../m_perfstats.h"
+#ifdef SRB2_REWRITE_DIAGNOSTICS
+#include "../rewrite/diagnostics.h"
+#endif
 #include "server_connection.h"
 #include "client_connection.h"
 #include "tic_command.h"
@@ -53,6 +56,10 @@
 #include "gamestate.h"
 #include "commands.h"
 #include "protocol.h"
+#ifdef __vita__
+#include "../vita/vita_framelog.h"
+#include "../vita/vita_prof.h"
+#endif
 
 //
 // NETWORKING
@@ -1315,6 +1322,9 @@ boolean TryRunTics(tic_t realtics)
 				if (update_stats)
 					PS_START_TIMING(ps_tictime);
 
+#ifdef __vita__
+				VITA_SampleLogic(update_stats);
+#endif
 				G_Ticker((gametic % NEWTICRATERATIO) == 0);
 				ExtraDataTicker();
 				gametic++;
@@ -1323,7 +1333,16 @@ boolean TryRunTics(tic_t realtics)
 				if (update_stats)
 				{
 					PS_STOP_TIMING(ps_tictime);
+#ifdef __vita__
+					VITA_SampleLogic(false);
+#endif
+#ifdef SRB2_REWRITE_DIAGNOSTICS
+					RewriteDiagnostics_RecordTick(gametic, ps_tictime.value.p);
+#endif
 					PS_UpdateTickStats();
+#ifdef __vita__
+					VITA_FrameTicStats();
+#endif
 				}
 
 				// Leave a certain amount of tics present in the net buffer as long as we've ran at least one tic this frame.

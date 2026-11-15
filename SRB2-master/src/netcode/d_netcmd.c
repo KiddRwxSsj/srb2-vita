@@ -12,6 +12,7 @@
 ///        commands are executed through the command buffer
 ///	       like console commands, other miscellaneous commands (at the end)
 
+#include "../p_dormant.h"
 #include "../doomdef.h"
 
 #include "../console.h"
@@ -541,6 +542,7 @@ void D_RegisterServerCommands(void)
 	CV_RegisterVar(&cv_glallowshaders);
 
 	// p_mobj.c
+	P_DormantInit();
 	CV_RegisterVar(&cv_itemrespawntime);
 	CV_RegisterVar(&cv_itemrespawn);
 	CV_RegisterVar(&cv_flagtime);

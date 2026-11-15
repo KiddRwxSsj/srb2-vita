@@ -12,11 +12,13 @@ project(srb2-vita C CXX)
 include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 
 set(SRB2_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/SRB2-master")
-set(VITAGL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tools/vitaGL")
+set(SRB2_VITAGL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tools/vitaGL" CACHE PATH "vitaGL source tree with libvitaGL.a")
+set(SRB2_VITA_SCE_SYS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys" CACHE PATH "LiveArea assets")
 
-if(NOT EXISTS "${VITAGL_DIR}/libvitaGL.a")
+if(NOT EXISTS "${SRB2_VITAGL_DIR}/libvitaGL.a")
 	message(FATAL_ERROR "vitaGL not built, run tools/build_vitagl.sh first")
 endif()
+set(VITAGL_DIR "${SRB2_VITAGL_DIR}")
 set(SRB2_SRC "${SRB2_ROOT}/src")
 
 file(STRINGS "${SRB2_SRC}/version.h" SRB2_VERSION_LINE LIMIT_COUNT 1)
@@ -40,53 +42,67 @@ set(SRB2_COMP_NOTE "PS Vita")
 set(SRB2_COMP_OPTIMIZED 1)
 configure_file("${SRB2_SRC}/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
 
-set(SRB2_CORE
-	comptime.c md5.c string.c
-	d_main.c dehacked.c deh_soc.c deh_lua.c deh_tables.c z_zone.c
-	f_finale.c f_wipe.c g_demo.c g_game.c g_input.c am_map.c
-	command.c console.c hu_stuff.c i_time.c y_inter.c st_stuff.c
-	m_aatree.c m_anigif.c m_argv.c m_bbox.c m_cheat.c m_cond.c m_easing.c
-	m_fixed.c m_menu.c m_misc.c m_perfstats.c m_random.c m_tokenizer.c
-	m_queue.c m_vector.c info.c
-	p_ceilng.c p_enemy.c p_floor.c p_inter.c p_lights.c p_map.c p_maputl.c
-	p_mobj.c p_polyobj.c p_saveg.c p_setup.c p_sight.c p_spec.c p_telept.c
-	p_tick.c p_user.c p_slopes.c tables.c
-	r_bsp.c r_data.c r_draw.c r_fps.c r_main.c r_plane.c r_segs.c r_skins.c
-	r_sky.c r_splats.c r_things.c r_bbox.c r_textures.c r_translation.c
-	r_patch.c r_patchrotation.c r_picformats.c r_portal.c
-	screen.c taglist.c v_video.c s_sound.c sounds.c w_wad.c filesrch.c
-	lzf.c b_bot.c u_list.c snake.c apng.c
-	lua_script.c lua_baselib.c lua_mathlib.c lua_hooklib.c lua_consolelib.c
-	lua_infolib.c lua_mobjlib.c lua_playerlib.c lua_skinlib.c
-	lua_thinkerlib.c lua_maplib.c lua_taglib.c lua_polyobjlib.c
-	lua_blockmaplib.c lua_hudlib.c lua_hudlib_drawlist.c lua_colorlib.c
-	lua_inputlib.c
+include("${SRB2_ROOT}/cmake/SRB2CoreSources.cmake")
 
+set(SRB2_CORE
+	${SRB2_SHARED_CORE_BASE}
+	apng.c
+	${SRB2_SHARED_CORE_LUA}
+)
+
+set(SRB2_VITA_BLUA_SOURCES
 	blua/lapi.c blua/lbaselib.c blua/ldo.c blua/lfunc.c blua/linit.c
 	blua/liolib.c blua/llex.c blua/lmem.c blua/lobject.c blua/lstate.c
 	blua/lstrlib.c blua/ltablib.c blua/lundump.c blua/lzio.c blua/lauxlib.c
 	blua/lcode.c blua/ldebug.c blua/ldump.c blua/lgc.c blua/lopcodes.c
 	blua/lparser.c blua/lstring.c blua/ltable.c blua/ltm.c blua/lvm.c
 	blua/loslib.c
+)
 
+set(SRB2_VITA_NET_SOURCES
 	netcode/d_clisrv.c netcode/server_connection.c netcode/client_connection.c
 	netcode/tic_command.c netcode/net_command.c netcode/gamestate.c
 	netcode/commands.c netcode/d_net.c netcode/d_netcmd.c netcode/d_netfil.c
 	netcode/http-mserv.c netcode/i_tcp.c netcode/mserv.c
+)
 
+set(SRB2_VITA_RENDER_SOURCES
 	hardware/hw_bsp.c hardware/hw_draw.c hardware/hw_light.c hardware/hw_main.c
 	hardware/hw_clip.c hardware/hw_md2.c hardware/hw_cache.c
 	hardware/hw_md2load.c hardware/hw_md3load.c hardware/hw_model.c
 	hardware/hw_batching.c hardware/hw_shaders.c hardware/r_opengl/r_opengl.c
+)
 
+set(SRB2_VITA_SDL_SOURCES
 	sdl/i_threads.c sdl/i_net.c sdl/i_system.c sdl/i_main.c
 	sdl/dosstr.c sdl/endtxt.c sdl/hwsym_sdl.c sdl/mixer_sound.c
+)
 
-	vita/i_video.c vita/ogl_vita.c vita/vita_io.c vita/vita_debug.c vita/vita_rthread.c
+set(SRB2_VITA_BACKEND_SOURCES
+	vita/i_video.c vita/ogl_vita.c vita/vita_io.c vita/vita_debug.c vita/vita_rthread.c vita/vita_framelog.c vita/vita_bench.c vita/vita_prof.c
+)
+
+list(APPEND SRB2_CORE
+	${SRB2_VITA_BLUA_SOURCES}
+	${SRB2_VITA_NET_SOURCES}
+	${SRB2_VITA_RENDER_SOURCES}
+	${SRB2_VITA_SDL_SOURCES}
+	${SRB2_VITA_BACKEND_SOURCES}
 )
 list(TRANSFORM SRB2_CORE PREPEND "${SRB2_SRC}/")
 
 add_executable(srb2 ${SRB2_CORE})
+option(SRB2_PERF_COUNT "Enable opt-in collision-query counting diagnostics" OFF)
+if(SRB2_PERF_COUNT)
+	target_sources(srb2 PRIVATE "${SRB2_SRC}/perf_count.c")
+	target_compile_definitions(srb2 PRIVATE SRB2_PERF_COUNT)
+endif()
+
+option(SRB2_REWRITE_DIAGNOSTICS "Enable rewrite diagnostics" OFF)
+if(SRB2_REWRITE_DIAGNOSTICS)
+	target_sources(srb2 PRIVATE "${SRB2_SRC}/rewrite/diagnostics.c" "${SRB2_SRC}/rewrite/diagnostics_console.c")
+	target_compile_definitions(srb2 PRIVATE SRB2_REWRITE_DIAGNOSTICS)
+endif()
 
 target_include_directories(srb2 PRIVATE
 	"${VITAGL_DIR}/source"
@@ -190,8 +206,8 @@ vita_create_self(eboot.bin srb2 UNSAFE)
 vita_create_vpk(srb2.vpk ${VITA_TITLEID} eboot.bin
 	VERSION ${VITA_VERSION}
 	NAME ${VITA_APP_NAME}
-	FILE "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/icon0.png" sce_sys/icon0.png
-	FILE "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/bg.png" sce_sys/livearea/contents/bg.png
-	FILE "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/startup.png" sce_sys/livearea/contents/startup.png
-	FILE "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/template.xml" sce_sys/livearea/contents/template.xml
+	FILE "${SRB2_VITA_SCE_SYS_DIR}/icon0.png" sce_sys/icon0.png
+	FILE "${SRB2_VITA_SCE_SYS_DIR}/livearea/contents/bg.png" sce_sys/livearea/contents/bg.png
+	FILE "${SRB2_VITA_SCE_SYS_DIR}/livearea/contents/startup.png" sce_sys/livearea/contents/startup.png
+	FILE "${SRB2_VITA_SCE_SYS_DIR}/livearea/contents/template.xml" sce_sys/livearea/contents/template.xml
 )
