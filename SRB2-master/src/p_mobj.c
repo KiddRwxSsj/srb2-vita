@@ -11,6 +11,7 @@
 /// \file  p_mobj.c
 /// \brief Moving object handling. Spawn functions
 
+#include "p_dormant.h"
 #include "dehacked.h"
 #include "doomdef.h"
 #include "g_game.h"
@@ -18,6 +19,7 @@
 #include "st_stuff.h"
 #include "hu_stuff.h"
 #include "p_local.h"
+#include "perf_count.h"
 #include "p_setup.h"
 #include "r_fps.h"
 #include "r_main.h"
@@ -32,6 +34,12 @@
 #include "info.h"
 #include "i_video.h"
 #include "lua_hook.h"
+#ifdef __vita__
+#include "vita/vita_prof.h"
+#else
+#define VPROF_ENTER(phase)
+#define VPROF_ACTION(action, call) call
+#endif
 #include "b_bot.h"
 #include "p_slopes.h"
 #include "f_finale.h"
@@ -477,7 +485,7 @@ static boolean P_SetPlayerMobjState(mobj_t *mobj, statenum_t state)
 			var1 = st->var1;
 			var2 = st->var2;
 			astate = st;
-			st->action(mobj);
+			VPROF_ACTION(st->action, st->action(mobj));
 
 			// woah. a player was removed by an action.
 			// this sounds like a VERY BAD THING, but there's nothing we can do now...
@@ -619,7 +627,7 @@ boolean P_SetMobjState(mobj_t *mobj, statenum_t state)
 			var1 = st->var1;
 			var2 = st->var2;
 			astate = st;
-			st->action(mobj);
+			VPROF_ACTION(st->action, st->action(mobj));
 			if (P_MobjWasRemoved(mobj))
 				return false;
 		}
@@ -2410,7 +2418,7 @@ boolean P_ZMovement(mobj_t *mo)
 			return true;
 		}
 
-		P_CheckPosition(mo, mo->x, mo->y); // Sets mo->standingslope correctly
+		PC_CHECK(mo, mo->x, mo->y, PC_MOBJ_Z); // Sets mo->standingslope correctly
 
 		if (P_MobjWasRemoved(mo)) // mobjs can be removed by P_CheckPosition -- Monster Iestyn 31/07/21
 			return false;
@@ -3840,6 +3848,18 @@ void P_NullPrecipThinker(precipmobj_t *mobj)
 	//(void)mobj;
 	mobj->precipflags &= ~PCF_THUNK;
 	R_ResetPrecipitationMobjInterpolationState(mobj);
+	mobj->resettic = precipresettic;
+}
+
+tic_t precipresettic = 0;
+UINT32 precipremovals = 0;
+
+// Weather is not networked or saved, so the per tic reset can wait until the
+// renderer touches the drop. Repeated resets with no draw in between are no-ops.
+void P_PrecipCatchUp(precipmobj_t *mobj)
+{
+	if (mobj->resettic != precipresettic)
+		P_NullPrecipThinker(mobj);
 }
 
 void P_SnowThinker(precipmobj_t *mobj)
@@ -3952,7 +3972,7 @@ static void P_RingThinker(mobj_t *mobj)
 	if (mobj->momz)
 	{
 		P_RingZMovement(mobj);
-		P_CheckPosition(mobj, mobj->x, mobj->y); // Need this to pick up objects!
+		PC_CHECK(mobj, mobj->x, mobj->y, PC_MOBJ_Z); // Need this to pick up objects!
 
 		if (P_MobjWasRemoved(mobj))
 			return;
@@ -6266,6 +6286,7 @@ void P_SpawnParaloop(fixed_t x, fixed_t y, fixed_t z, fixed_t radius, INT32 numb
 //
 void P_SetScale(mobj_t *mobj, fixed_t newscale, boolean instant)
 {
+	P_DormantTouch(mobj);
 	if (!mobj)
 		return;
 
@@ -6276,7 +6297,7 @@ void P_SetScale(mobj_t *mobj, fixed_t newscale, boolean instant)
 		mobj->player->viewheight = FixedMul(FixedDiv(mobj->player->viewheight, mobj->scale), newscale);
 	}
 
-	mobj->radius = FixedMul(FixedDiv(mobj->radius, mobj->scale), newscale);
+	PC_WRITE(mobj, radius, FixedMul(FixedDiv(mobj->radius, mobj->scale), newscale));
 	mobj->height = FixedMul(FixedDiv(mobj->height, mobj->scale), newscale);
 
 	mobj->scale = newscale;
@@ -7097,8 +7118,8 @@ static boolean P_DrownNumbersSceneryThink(mobj_t *mobj)
 		P_RemoveMobj(mobj);
 		return false;
 	}
-	mobj->x = mobj->target->x;
-	mobj->y = mobj->target->y;
+	PC_WRITE(mobj, x, mobj->target->x);
+	PC_WRITE(mobj, y, mobj->target->y);
 
 	P_SetScale(mobj, mobj->target->scale, false);
 	mobj->destscale = mobj->target->destscale;
@@ -7732,8 +7753,8 @@ static void P_MobjSceneryThink(mobj_t *mobj)
 
 		mobj->flags2 &= ~MF2_DONTDRAW;
 
-		mobj->x = mobj->target->x;
-		mobj->y = mobj->target->y;
+		PC_WRITE(mobj, x, mobj->target->x);
+		PC_WRITE(mobj, y, mobj->target->y);
 
 		mobj->eflags |= (mobj->target->eflags & MFE_VERTICALFLIP);
 
@@ -10142,6 +10163,8 @@ void P_MobjThinker(mobj_t *mobj)
 	I_Assert(mobj != NULL);
 	I_Assert(!P_MobjWasRemoved(mobj));
 
+	if (P_DORMANT_SKIP(mobj)) return;
+
 	if (mobj->flags & MF_NOTHINK)
 		return;
 
@@ -10189,11 +10212,13 @@ void P_MobjThinker(mobj_t *mobj)
 	// Special thinker for scenery objects
 	if (mobj->flags & MF_SCENERY)
 	{
+		VPROF_ENTER(VPROF_SCENERY);
 		P_MobjSceneryThink(mobj);
 		return;
 	}
 
 	// Check for a Lua thinker first
+	VPROF_ENTER(VPROF_LUA);
 	if (!mobj->player)
 	{
 		if (LUA_HookMobj(mobj, MOBJ_HOOK(MobjThinker)) || P_MobjWasRemoved(mobj))
@@ -10209,6 +10234,7 @@ void P_MobjThinker(mobj_t *mobj)
 
 	// if it's pushable, or if it would be pushable other than temporary disablement, use the
 	// separate thinker
+	VPROF_ENTER(VPROF_THINK);
 	if (mobj->flags & MF_PUSHABLE || (mobj->info->flags & MF_PUSHABLE && mobj->fuse))
 	{
 		if (!P_MobjPushableThink(mobj))
@@ -10253,12 +10279,14 @@ void P_MobjThinker(mobj_t *mobj)
 
 	if (mobj->momx || mobj->momy || (mobj->flags2 & MF2_SKULLFLY))
 	{
+		VPROF_ENTER(VPROF_XY);
 		P_XYMovement(mobj);
 		if (P_MobjWasRemoved(mobj))
 			return;
 	}
 
 	// always do the gravity bit now, that's simpler
+	VPROF_ENTER(VPROF_Z);
 	// BUT CheckPosition only if wasn't done before.
 	if (!(mobj->eflags & MFE_ONGROUND) || mobj->momz
 		|| ((mobj->eflags & MFE_VERTICALFLIP) && mobj->z + mobj->height != mobj->ceilingz)
@@ -10267,7 +10295,7 @@ void P_MobjThinker(mobj_t *mobj)
 	{
 		if (!P_ZMovement(mobj))
 			return; // mobj was removed
-		P_CheckPosition(mobj, mobj->x, mobj->y); // Need this to pick up objects!
+		PC_CHECK(mobj, mobj->x, mobj->y, PC_MOBJ_Z); // Need this to pick up objects!
 		if (P_MobjWasRemoved(mobj))
 			return;
 	}
@@ -10318,6 +10346,7 @@ void P_MobjThinker(mobj_t *mobj)
 	}
 
 	// Can end up here if a player dies.
+	VPROF_ENTER(VPROF_STATE);
 	P_CycleMobjState(mobj);
 
 	if (P_MobjWasRemoved(mobj))
@@ -10447,6 +10476,7 @@ void P_PushableThinker(mobj_t *mobj)
 // Quick, optimized function for scenery
 void P_SceneryThinker(mobj_t *mobj)
 {
+	if (P_DORMANT_SKIP(mobj)) return;
 	if (mobj->flags & MF_BOXICON)
 	{
 		if (!(mobj->eflags & MFE_VERTICALFLIP))
@@ -10483,7 +10513,7 @@ void P_SceneryThinker(mobj_t *mobj)
 	{
 		if (!P_SceneryZMovement(mobj))
 			return; // mobj was removed
-		P_CheckPosition(mobj, mobj->x, mobj->y); // Need this to pick up objects!
+		PC_CHECK(mobj, mobj->x, mobj->y, PC_SCENERY_Z); // Need this to pick up objects!
 		if (P_MobjWasRemoved(mobj))
 			return;
 		mobj->floorz = tmfloorz;
@@ -11071,7 +11101,7 @@ mobj_t *P_SpawnMobj(fixed_t x, fixed_t y, fixed_t z, mobjtype_t type, ...)
 			var1 = st->var1;
 			var2 = st->var2;
 			astate = st;
-			st->action(mobj);
+			VPROF_ACTION(st->action, st->action(mobj));
 			// DANGER! This can cause P_SpawnMobj to return NULL!
 			// Avoid using MF_RUNSPAWNFUNC on mobjs whose spawn state expects target or tracer to already be set!
 			if (P_MobjWasRemoved(mobj))
@@ -11120,6 +11150,7 @@ static precipmobj_t *P_SpawnPrecipMobj(fixed_t x, fixed_t y, fixed_t z, mobjtype
 	mobj->momz = mobjinfo[type].speed;
 
 	mobj->thinker.function = (actionf_p1)P_NullPrecipThinker;
+	mobj->resettic = precipresettic;
 	P_AddThinker(THINK_PRECIP, &mobj->thinker);
 
 	CalculatePrecipFloor(mobj);
@@ -11180,9 +11211,13 @@ size_t iquehead, iquetail;
 void P_RemoveMobj(mobj_t *mobj)
 {
 	I_Assert(mobj != NULL);
+	P_DormantTouch(mobj);
+	P_DormantTouch(mobj->target); P_DormantTouch(mobj->tracer);
+	P_DormantTouch(mobj->hnext); P_DormantTouch(mobj->hprev);
 	if (P_MobjWasRemoved(mobj) || mobj->thinker.removing)
 		return; // Something already removed or is removing this mobj.
 
+	PC_Forget(mobj);
 	mobj->thinker.removing = true; // Set earlier to avoid recursion.
 	LUA_HookMobj(mobj, MOBJ_HOOK(MobjRemoved));
 
@@ -11692,7 +11727,7 @@ void P_SpawnPlayer(INT32 playernum)
 	P_FlashPal(p, 0, 0); // Resets
 
 	// Set bounds accurately.
-	mobj->radius = FixedMul(skins[p->skin]->radius, mobj->scale);
+	PC_WRITE(mobj, radius, FixedMul(skins[p->skin]->radius, mobj->scale));
 	mobj->height = P_GetPlayerHeight(p);
 
 	if (!leveltime && !p->spectator && ((maptol & TOL_NIGHTS) == TOL_NIGHTS) != (G_IsSpecialStage(gamemap))) // non-special NiGHTS stage or special non-NiGHTS stage
@@ -12638,7 +12673,7 @@ static boolean P_SetupNiGHTSDrone(mapthing_t *mthing, mobj_t *mobj)
 		mobj->health = timelimit;
 
 	if (hitboxradius > 0)
-		mobj->radius = hitboxradius;
+		PC_WRITE(mobj, radius, hitboxradius);
 
 	if (hitboxheight > 0)
 		mobj->height = hitboxheight;
@@ -13228,7 +13263,7 @@ static boolean P_SetupSpawnedMapThing(mapthing_t *mthing, mobj_t *mobj, boolean 
 		if (mthing->args[3])
 			mobj->flags2 |= MF2_AMBUSH;
 
-		mobj->radius = abs(mthing->args[2]) << FRACBITS;
+		PC_WRITE(mobj, radius, abs(mthing->args[2]) << FRACBITS);
 		// FALLTHRU
 	case MT_AXISTRANSFER:
 	case MT_AXISTRANSFERLINE:
@@ -13906,8 +13941,8 @@ boolean P_CheckMissileSpawn(mobj_t *th)
 	// move a little forward so an angle can be computed if it immediately explodes
 	if (!(th->flags & MF_GRENADEBOUNCE)) // hack: bad! should be a flag.
 	{
-		th->x += th->momx>>1;
-		th->y += th->momy>>1;
+		PC_WRITE(th, x, th->x + (th->momx>>1));
+		PC_WRITE(th, y, th->y + (th->momy>>1));
 		th->z += th->momz>>1;
 	}
 
@@ -14041,8 +14076,8 @@ mobj_t *P_SpawnAlteredDirectionMissile(mobj_t *source, mobjtype_t type, fixed_t 
 	if (th->flags & MF_MISSILE)
 	{
 		dist = P_CheckMissileSpawn(th);
-		th->x -= th->momx>>1;
-		th->y -= th->momy>>1;
+		PC_WRITE(th, x, th->x - (th->momx>>1));
+		PC_WRITE(th, y, th->y - (th->momy>>1));
 		th->z -= th->momz>>1;
 	}
 	else

@@ -12,6 +12,7 @@
 /// \brief Do all the WAD I/O, get map description, set up initial state and misc. LUTs
 
 #include "doomdef.h"
+#include "i_output.h"
 #include "d_main.h"
 #include "byteptr.h"
 #include "g_game.h"
@@ -916,7 +917,7 @@ void P_WriteThings(const char *filepath)
 
 	if (udmf)
 	{
-		FILE *f = fopen(va("%s.txt", filepath), "w");
+		FILE *f = I_OpenFile(va("%s.txt", filepath), "w");
 		if (!f)
 		{
 			CONS_Alert(CONS_ERROR, M_GetText("Couldn't write to file %s\n"), filepath);
@@ -2318,7 +2319,7 @@ static void P_WriteTextmap(void)
 	mtag_t freetag;
 	sectorspecialthings_t *specialthings;
 
-	f = fopen(filepath, "w");
+	f = I_OpenFile(filepath, "w");
 	if (!f)
 	{
 		CONS_Alert(CONS_ERROR, M_GetText("Couldn't save map file %s\n"), filepath);
@@ -7151,6 +7152,7 @@ static boolean P_LoadMapFromFile(void)
 	if (!P_LoadMapData(virt))
 		return false;
 	P_LoadMapBSP(virt);
+	P_ClearPointInSubsectorCache();
 	P_LoadMapLUT(virt);
 
 	P_LinkMapData();

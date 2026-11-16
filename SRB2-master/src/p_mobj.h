@@ -294,6 +294,9 @@ typedef struct mobj_s
 
 	// Info for drawing: position.
 	fixed_t x, y, z;
+	// For movement checking.
+	fixed_t radius;
+	fixed_t height;
 	fixed_t old_x, old_y, old_z; // position interpolation
 	fixed_t old_x2, old_y2, old_z2;
 
@@ -329,10 +332,6 @@ typedef struct mobj_s
 	fixed_t ceilingz; // Nearest ceiling above.
 	struct ffloor_s *floorrover; // FOF referred by floorz
 	struct ffloor_s *ceilingrover; // FOF referred by ceilingz
-
-	// For movement checking.
-	fixed_t radius;
-	fixed_t height;
 
 	// Momentums, used to update position.
 	fixed_t momx, momy, momz;
@@ -421,6 +420,9 @@ typedef struct mobj_s
 	fixed_t shadowscale; // If this object casts a shadow, and the size relative to radius
 	INT32 dispoffset; // copy of info->dispoffset, so mobjs can be sorted independently of their type
 
+	UINT8 dormant_flags; // Transient single-player performance state, never serialized.
+	tic_t dormant_touch;
+
 	// WARNING: New fields must be added separately to savegame and Lua.
 } mobj_t;
 
@@ -438,6 +440,9 @@ typedef struct precipmobj_s
 
 	// Info for drawing: position.
 	fixed_t x, y, z;
+	// For movement checking.
+	fixed_t radius; // Fixed at 2*FRACUNIT
+	fixed_t height; // Fixed at 4*FRACUNIT
 	fixed_t old_x, old_y, old_z; // position interpolation
 	fixed_t old_x2, old_y2, old_z2;
 
@@ -474,10 +479,6 @@ typedef struct precipmobj_s
 	struct ffloor_s *floorrover; // FOF referred by floorz
 	struct ffloor_s *ceilingrover; // FOF referred by ceilingz
 
-	// For movement checking.
-	fixed_t radius; // Fixed at 2*FRACUNIT
-	fixed_t height; // Fixed at 4*FRACUNIT
-
 	// Momentums, used to update position.
 	fixed_t momx, momy, momz;
 	fixed_t precipflags; // fixed_t so it uses the same spot as "pmomz" even as we use precipflags_t for it
@@ -485,7 +486,13 @@ typedef struct precipmobj_s
 	INT32 tics; // state tic counter
 	state_t *state;
 	INT32 flags; // flags from mobjinfo tables
+
+	tic_t resettic; // precipresettic value at its last P_NullPrecipThinker run
 } precipmobj_t;
+
+extern tic_t precipresettic;
+extern UINT32 precipremovals;
+void P_PrecipCatchUp(precipmobj_t *mobj);
 
 typedef struct actioncache_s
 {

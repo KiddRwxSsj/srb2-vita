@@ -13,6 +13,7 @@
 ///
 ///	Shooting and aiming
 
+#include "p_dormant.h"
 #include "doomdef.h"
 #include "g_game.h"
 #include "m_bbox.h"
@@ -33,8 +34,53 @@
 #include "z_zone.h"
 
 #include "lua_hook.h"
+#include "perf_count.h"
 
 #include "m_perfstats.h" // ps_checkposition_calls
+#ifdef __vita__
+#include "vita/vita_prof.h"
+#else
+#define VPROF_CP_BEGIN(mark)
+#define VPROF_CP_SECTION(section, mark)
+#define VPROF_CP_END(mark)
+#define VPROF_COUNT(counter)
+#endif
+
+#if defined(__vita__) || defined(SRB2_PERF_COUNT)
+static pccaller_t pc_caller, pc_sector_caller;
+
+boolean P_CheckPositionCaller(mobj_t *thing, fixed_t x, fixed_t y, pccaller_t caller)
+{
+	pccaller_t previous = pc_caller;
+	boolean result;
+#ifdef __vita__
+	UINT32 saved = VITA_SamplePushCaller((UINT32)caller);
+#endif
+	pc_caller = caller;
+	result = P_CheckPosition(thing, x, y);
+	pc_caller = previous;
+#ifdef __vita__
+	VITA_SamplePop(saved);
+#endif
+	return result;
+}
+#endif
+
+#ifdef SRB2_PERF_COUNT
+#define PC_PTR(value) ((UINT64)(uintptr_t)(value))
+#define PC_FINISH(answer) do { \
+	const UINT64 outputs[] = {PC_PTR(tmthing), tmflags, tmx, tmy, \
+		tmbbox[0], tmbbox[1], tmbbox[2], tmbbox[3], \
+		tmfloorz, tmceilingz, tmdropoffz, tmdrpoffceilz, \
+		PC_PTR(tmfloorrover), PC_PTR(tmceilingrover), PC_PTR(tmfloorslope), PC_PTR(tmceilingslope), \
+		PC_PTR(tmfloorthing), PC_PTR(tmhitthing), PC_PTR(blockingline), PC_PTR(ceilingline), \
+		opentop, openbottom, openrange, lowfloor, highceiling, \
+		PC_PTR(openfloorrover), PC_PTR(openceilingrover), PC_PTR(opentopslope), PC_PTR(openbottomslope), thing->momz}; \
+	PC_End(pc_token, answer, outputs, sizeof outputs / sizeof outputs[0]); \
+} while (0)
+#else
+#define PC_FINISH(answer) ((void)0)
+#endif
 
 // Formerly called MAXRADIUS
 #define MAXTRYMOVE (32*FRACUNIT)
@@ -746,6 +792,7 @@ enum
 static unsigned PIT_DoCheckThing(mobj_t *thing)
 {
 	fixed_t blockdist;
+	PC_Thing(thing);
 
 	// don't clip against self
 	if (thing == tmthing)
@@ -755,6 +802,14 @@ static unsigned PIT_DoCheckThing(mobj_t *thing)
 	if (!tmthing || !thing || P_MobjWasRemoved(thing))
 		return CHECKTHING_IGNORE;
 
+	// Every path below rejects on this same box before any side effect,
+	// and PIT_CheckThing treats IGNORE and NOCOLLIDE alike.
+	blockdist = thing->radius + tmthing->radius;
+	if (abs(thing->x - tmx) >= blockdist || abs(thing->y - tmy) >= blockdist)
+		return CHECKTHING_NOCOLLIDE;
+
+	P_DormantTouch(thing);
+	P_DormantTouch(tmthing);
 	I_Assert(!P_MobjWasRemoved(tmthing));
 	I_Assert(!P_MobjWasRemoved(thing));
 
@@ -1845,6 +1900,7 @@ static unsigned PIT_DoCheckThing(mobj_t *thing)
 
 static boolean PIT_CheckThing(mobj_t *thing)
 {
+	VPROF_COUNT(vprof_cpthings);
 	return PIT_DoCheckThing(thing) != CHECKTHING_DONE;
 }
 
@@ -1914,6 +1970,8 @@ static boolean PIT_CheckCameraLine(line_t *ld)
 //
 static boolean PIT_CheckLine(line_t *ld)
 {
+	PC_Line(ld);
+	VPROF_COUNT(vprof_cplines);
 	if (ld->polyobj && !(ld->polyobj->flags & POF_SOLID))
 		return true;
 
@@ -2021,11 +2079,49 @@ static boolean PIT_CheckLine(line_t *ld)
 // =========================================================================
 //                         MOVEMENT CLIPPING
 // =========================================================================
+// The BSP never changes within a level, so R_PointInSubsector is a pure
+// function of (x, y) until the next map load. Most P_CheckPosition calls
+// repeat the position of a thing that did not move, so a direct-mapped
+// memo skips the node walk. Game thread only.
+#define SSCACHE_BITS 12
+
+static struct
+{
+	fixed_t x, y;
+	subsector_t *ss;
+} sscache[1<<SSCACHE_BITS];
+
+void P_ClearPointInSubsectorCache(void)
+{
+	memset(sscache, 0, sizeof sscache);
+}
+
+static subsector_t *P_CachedPointInSubsector(fixed_t x, fixed_t y)
+{
+	UINT32 h = ((UINT32)x * 0x9E3779B1u ^ (UINT32)y * 0x85EBCA77u) >> (32 - SSCACHE_BITS);
+
+	if (sscache[h].ss && sscache[h].x == x && sscache[h].y == y)
+		return sscache[h].ss;
+	sscache[h].x = x;
+	sscache[h].y = y;
+	return sscache[h].ss = R_PointInSubsector(x, y);
+}
+
 boolean P_CheckPosition(mobj_t *thing, fixed_t x, fixed_t y)
 {
 	INT32 xl, xh, yl, yh, bx, by;
 	subsector_t *newsubsec;
 	boolean blockval = true;
+#ifdef SRB2_PERF_COUNT
+	UINT64 pc_token = PC_Begin(thing, x, y, pc_caller);
+	PC_INPUT(tmdrpoffceilz);
+	PC_INPUT(opentop); PC_INPUT(openbottom); PC_INPUT(openrange);
+	PC_INPUT(lowfloor); PC_INPUT(highceiling);
+	PC_INPUT(openfloorrover); PC_INPUT(openceilingrover);
+	PC_INPUT(opentopslope); PC_INPUT(openbottomslope);
+#endif
+
+	VPROF_CP_BEGIN(vprofmark);
 
 	ps_checkposition_calls.value.i++;
 
@@ -2035,6 +2131,7 @@ boolean P_CheckPosition(mobj_t *thing, fixed_t x, fixed_t y)
 		I_Error("Previously-removed Thing of type %u crashes P_CheckPosition!", thing->type);
 #endif
 
+	P_DormantTouch(thing);
 	P_SetTarget(&tmthing, thing);
 	tmflags = thing->flags;
 
@@ -2046,7 +2143,8 @@ boolean P_CheckPosition(mobj_t *thing, fixed_t x, fixed_t y)
 	tmbbox[BOXRIGHT] = x + tmthing->radius;
 	tmbbox[BOXLEFT] = x - tmthing->radius;
 
-	newsubsec = R_PointInSubsector(x, y);
+	newsubsec = P_CachedPointInSubsector(x, y);
+	PC_Sector(newsubsec->sector);
 	ceilingline = blockingline = NULL;
 
 	// The base floor / ceiling is from the subsector
@@ -2059,6 +2157,8 @@ boolean P_CheckPosition(mobj_t *thing, fixed_t x, fixed_t y)
 	tmceilingrover = NULL;
 	tmfloorslope = newsubsec->sector->f_slope;
 	tmceilingslope = newsubsec->sector->c_slope;
+
+	VPROF_CP_SECTION(VPROF_CP_SUBSEC, vprofmark);
 
 	// Check list of fake floors and see if tmfloorz/tmceilingz need to be altered.
 	if (newsubsec->sector->ffloors)
@@ -2168,12 +2268,15 @@ boolean P_CheckPosition(mobj_t *thing, fixed_t x, fixed_t y)
 		}
 	}
 
+	VPROF_CP_SECTION(VPROF_CP_FOF, vprofmark);
+
 	xl = (unsigned)(tmbbox[BOXLEFT] - bmaporgx)>>MAPBLOCKSHIFT;
 	xh = (unsigned)(tmbbox[BOXRIGHT] - bmaporgx)>>MAPBLOCKSHIFT;
 	yl = (unsigned)(tmbbox[BOXBOTTOM] - bmaporgy)>>MAPBLOCKSHIFT;
 	yh = (unsigned)(tmbbox[BOXTOP] - bmaporgy)>>MAPBLOCKSHIFT;
 
 	BMBOUNDFIX(xl, xh, yl, yh);
+	PC_Cells(xl, xh, yl, yh);
 
 	// Check polyobjects and see if tmfloorz/tmceilingz need to be altered
 	{
@@ -2253,8 +2356,14 @@ boolean P_CheckPosition(mobj_t *thing, fixed_t x, fixed_t y)
 
 	validcount++;
 
+	VPROF_CP_SECTION(VPROF_CP_POLY, vprofmark);
+
 	if (tmflags & MF_NOCLIP)
+	{
+		VPROF_CP_END(vprofmark);
+		PC_FINISH(true);
 		return true;
+	}
 
 	// Check things first.
 	if (!(thing->flags & MF_NOCLIPTHING))
@@ -2267,9 +2376,15 @@ boolean P_CheckPosition(mobj_t *thing, fixed_t x, fixed_t y)
 				else
 					tmhitthing = tmfloorthing;
 				if (P_MobjWasRemoved(tmthing))
+				{
+					VPROF_CP_END(vprofmark);
+					PC_FINISH(false);
 					return false;
+				}
 			}
 	}
+
+	VPROF_CP_SECTION(VPROF_CP_THINGS, vprofmark);
 
 	validcount++;
 
@@ -2279,6 +2394,9 @@ boolean P_CheckPosition(mobj_t *thing, fixed_t x, fixed_t y)
 			if (!P_BlockLinesIterator(bx, by, PIT_CheckLine))
 				blockval = false;
 
+	VPROF_CP_SECTION(VPROF_CP_LINES, vprofmark);
+	VPROF_CP_END(vprofmark);
+	PC_FINISH(blockval);
 	return blockval;
 }
 
@@ -2711,7 +2829,7 @@ increment_move
 				tryy = y;
 		}
 
-		if (!P_CheckPosition(thing, tryx, tryy) || P_MobjWasRemoved(thing))
+		if (!PC_CHECK(thing, tryx, tryy, PC_TRYMOVE) || P_MobjWasRemoved(thing))
 			return false; // solid wall or thing
 
 		if (!(thing->flags & MF_NOCLIP))
@@ -2838,7 +2956,7 @@ boolean P_CheckMove(mobj_t *thing, fixed_t x, fixed_t y, boolean allowdropoff)
 	if (P_MobjWasRemoved(hack))
 		return false;
 
-	hack->radius = thing->radius;
+	PC_WRITE(hack, radius, thing->radius);
 	hack->height = thing->height;
 
 	moveok = increment_move(hack, x, y, allowdropoff);
@@ -2953,7 +3071,7 @@ boolean P_SceneryTryMove(mobj_t *thing, fixed_t x, fixed_t y)
 		else
 			tryy = y;
 
-		if (!P_CheckPosition(thing, tryx, tryy) || P_MobjWasRemoved(thing))
+		if (!PC_CHECK(thing, tryx, tryy, PC_TRYMOVE) || P_MobjWasRemoved(thing))
 			return false; // solid wall or thing
 
 		if (!(thing->flags & MF_NOCLIP))
@@ -3015,7 +3133,7 @@ static boolean P_ThingHeightClip(mobj_t *thing)
 	if (thing->flags & MF_NOCLIPHEIGHT)
 		return true;
 
-	P_CheckPosition(thing, thing->x, thing->y);
+	PC_CHECK(thing, thing->x, thing->y, pc_sector_caller);
 
 	if (P_MobjWasRemoved(thing))
 		return true;
@@ -4243,11 +4361,35 @@ void P_RadiusAttack(mobj_t *spot, mobj_t *source, fixed_t damagedist, UINT8 dama
 //
 // PIT_ChangeSector
 //
+#if defined(__vita__) || defined(SRB2_PERF_COUNT)
+static boolean PIT_DoChangeSector(mobj_t *thing, boolean realcrush, boolean crunch);
+
 static boolean PIT_ChangeSector(mobj_t *thing, boolean realcrush, boolean crunch)
+{
+#ifdef __vita__
+	UINT32 saved = VITA_SamplePush(VSAMPLE_CHANGESECTOR);
+#endif
+	pccaller_t previous = pc_sector_caller;
+	pc_sector_caller = realcrush ? PC_HEIGHT_SECOND : PC_HEIGHT_FIRST;
+	boolean result = PIT_DoChangeSector(thing, realcrush, crunch);
+
+	pc_sector_caller = previous;
+#ifdef __vita__
+	VITA_SamplePop(saved);
+#endif
+	return result;
+}
+
+static boolean PIT_DoChangeSector(mobj_t *thing, boolean realcrush, boolean crunch)
+#else
+static boolean PIT_ChangeSector(mobj_t *thing, boolean realcrush, boolean crunch)
+#endif
 {
 	mobj_t *killer = NULL;
 	//If a thing is both pushable and vulnerable, it doesn't block the crusher because it gets killed.
 	boolean immunepushable = ((thing->flags & (MF_PUSHABLE | MF_SHOOTABLE)) == MF_PUSHABLE);
+
+	if (P_DormantClip(thing)) return true;
 
 	if (P_ThingHeightClip(thing))
 	{
@@ -4349,6 +4491,13 @@ static boolean PIT_ChangeSector(mobj_t *thing, boolean realcrush, boolean crunch
 	return true;
 }
 
+void P_DormantRefresh(mobj_t *thing)
+{
+	PC_CHECK(thing, thing->x, thing->y, PC_HEIGHT_SECOND);
+	if (P_MobjWasRemoved(thing)) return;
+	PIT_ChangeSector(thing, true, true);
+}
+
 static boolean P_CheckSectorPolyObjects(sector_t *sector, boolean realcrush, boolean crunch)
 {
 	size_t i;
@@ -4403,31 +4552,45 @@ static boolean P_CheckSectorPolyObjects(sector_t *sector, boolean realcrush, boo
 	return true;
 }
 
+// Bumped whenever any sector thing list gains or loses a node, or has its
+// visited marks reset by a nested scan
+static UINT32 secnodegen = 0;
+
 static boolean P_CheckTouchingThinglist(sector_t *sector, boolean realcrush, boolean crunch)
 {
 	msecnode_t *n;
+	UINT32 gen;
 
+	secnodegen++;
 	for (n = sector->touching_thinglist; n; n = n->m_thinglist_next)
 		n->visited = false;
 
-	do
+	n = sector->touching_thinglist;
+	while (n)
 	{
-		for (n = sector->touching_thinglist; n; n = n->m_thinglist_next) // go through list
+		if (n->visited)
 		{
-			if (n->visited)
-				continue;
-
-			n->visited = true; // mark thing as processed
-
-			if (n->m_thing->flags & MF_NOBLOCKMAP) //jff 4/7/98 don't do these
-				continue;
-
-			if (!PIT_ChangeSector(n->m_thing, realcrush, crunch) && !realcrush) // process it
-				return false;
-
-			break; // exit and start over
+			n = n->m_thinglist_next;
+			continue;
 		}
-	} while (n); // repeat from scratch until all things left are marked valid
+
+		n->visited = true; // mark thing as processed
+
+		if (n->m_thing->flags & MF_NOBLOCKMAP) //jff 4/7/98 don't do these
+		{
+			n = n->m_thinglist_next;
+			continue;
+		}
+
+		gen = secnodegen;
+		if (!PIT_ChangeSector(n->m_thing, realcrush, crunch) && !realcrush) // process it
+			return false;
+
+		// Restarting from the head only matters if the list changed. Otherwise
+		// every earlier node is still visited and the rescan would land right
+		// after this one, so this keeps the old visiting order without O(n^2).
+		n = (gen == secnodegen) ? n->m_thinglist_next : sector->touching_thinglist;
+	}
 
 	return true;
 }
@@ -4579,6 +4742,7 @@ static msecnode_t *P_AddSecnode(sector_t *s, mobj_t *thing, msecnode_t *nextnode
 	// of the list.
 
 	node = P_GetSecnode();
+	secnodegen++;
 
 	// mark new nodes unvisited.
 	node->visited = 0;
@@ -4670,6 +4834,7 @@ static msecnode_t *P_DelSecnode(msecnode_t *node)
 
 	sp = node->m_thinglist_prev;
 	sn = node->m_thinglist_next;
+	secnodegen++;
 	if (sp)
 		sp->m_thinglist_next = sn;
 	else
@@ -4814,7 +4979,21 @@ static inline boolean PIT_GetPrecipSectors(line_t *ld)
 // P_CreateSecNodeList alters/creates the sector_list that shows what sectors
 // the object resides in.
 
+#ifdef __vita__
+static void P_DoCreateSecNodeList(mobj_t *thing, fixed_t x, fixed_t y);
+
 void P_CreateSecNodeList(mobj_t *thing, fixed_t x, fixed_t y)
+{
+	UINT32 saved = VITA_SamplePush(VSAMPLE_SECNODES);
+
+	P_DoCreateSecNodeList(thing, x, y);
+	VITA_SamplePop(saved);
+}
+
+static void P_DoCreateSecNodeList(mobj_t *thing, fixed_t x, fixed_t y)
+#else
+void P_CreateSecNodeList(mobj_t *thing, fixed_t x, fixed_t y)
+#endif
 {
 	INT32 xl, xh, yl, yh, bx, by;
 	msecnode_t *node = sector_list;

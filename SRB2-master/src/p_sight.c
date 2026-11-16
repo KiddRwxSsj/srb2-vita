@@ -17,6 +17,9 @@
 #include "p_slopes.h"
 #include "r_main.h"
 #include "r_state.h"
+#ifdef __vita__
+#include "vita/vita_prof.h"
+#endif
 
 //
 // P_CheckSight
@@ -377,7 +380,21 @@ static boolean P_CrossBSPNode(INT32 bspnum, register los_t *los)
 // Returns true if a straight line between t1 and t2 is unobstructed.
 // Uses REJECT.
 //
+#ifdef __vita__
+static boolean P_DoCheckSight(mobj_t *t1, mobj_t *t2);
+
 boolean P_CheckSight(mobj_t *t1, mobj_t *t2)
+{
+	VPROF_SIGHT_BEGIN(vprofmark);
+	boolean seen = P_DoCheckSight(t1, t2);
+	VPROF_SIGHT_END(vprofmark);
+	return seen;
+}
+
+static boolean P_DoCheckSight(mobj_t *t1, mobj_t *t2)
+#else
+boolean P_CheckSight(mobj_t *t1, mobj_t *t2)
+#endif
 {
 	const sector_t *s1, *s2;
 	size_t pnum;

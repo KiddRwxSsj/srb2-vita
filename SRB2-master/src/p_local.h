@@ -415,6 +415,7 @@ void P_SetThingPosition(mobj_t *thing);
 void P_SetUnderlayPosition(mobj_t *thing);
 
 boolean P_CheckPosition(mobj_t *thing, fixed_t x, fixed_t y);
+void P_ClearPointInSubsectorCache(void);
 boolean P_CheckCameraPosition(fixed_t x, fixed_t y, camera_t *thiscam);
 boolean P_CheckMove(mobj_t *thing, fixed_t x, fixed_t y, boolean allowdropoff);
 boolean P_TryMove(mobj_t *thing, fixed_t x, fixed_t y, boolean allowdropoff);

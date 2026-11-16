@@ -158,6 +158,7 @@ consvar_t cv_showhud = CVAR_INIT ("showhud", "Yes", CV_CALL|CV_ALLOWLUA,  CV_Yes
 consvar_t cv_translucenthud = CVAR_INIT ("translucenthud", "10", CV_SAVE, translucenthud_cons_t, NULL);
 
 consvar_t cv_translucency = CVAR_INIT ("translucency", "On", CV_SAVE, CV_OnOff, NULL);
+consvar_t cv_fullvisibility = CVAR_INIT ("fullvisibility", "On", CV_SAVE, CV_OnOff, NULL);
 #ifdef __vita__
 consvar_t cv_drawdist = CVAR_INIT ("drawdist", "3072", CV_SAVE, drawdist_cons_t, NULL);
 #else
@@ -1654,6 +1655,7 @@ void R_RegisterEngineStuff(void)
 
 	CV_RegisterVar(&cv_homremoval);
 	CV_RegisterVar(&cv_translucency);
+	CV_RegisterVar(&cv_fullvisibility);
 	CV_RegisterVar(&cv_drawdist);
 	CV_RegisterVar(&cv_drawdist_nights);
 	CV_RegisterVar(&cv_drawdist_precip);

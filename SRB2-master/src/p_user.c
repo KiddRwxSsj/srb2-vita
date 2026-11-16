@@ -22,6 +22,7 @@
 #include "g_demo.h" // demoplayback, demoversion
 #include "g_game.h"
 #include "p_local.h"
+#include "perf_count.h"
 #include "r_fps.h"
 #include "r_main.h"
 #include "s_sound.h"
@@ -3250,8 +3251,8 @@ static void P_DoPlayerHeadSigns(player_t *player)
 			sign = P_SpawnMobjFromMobj(player->mo, 0, 0, 0, MT_TAG);
 			if (!P_MobjWasRemoved(sign))
 			{
-				sign->x = player->mo->x;
-				sign->y = player->mo->y;
+				PC_WRITE(sign, x, player->mo->x);
+				PC_WRITE(sign, y, player->mo->y);
 				sign->z = player->mo->z;
 				sign->old_x = player->mo->old_x;
 				sign->old_y = player->mo->old_y;
@@ -3292,8 +3293,8 @@ static void P_DoPlayerHeadSigns(player_t *player)
 			sign = P_SpawnMobjFromMobj(player->mo, 0, 0, 0, MT_GOTFLAG);
 			if (!P_MobjWasRemoved(sign))
 			{
-				sign->x = player->mo->x;
-				sign->y = player->mo->y;
+				PC_WRITE(sign, x, player->mo->x);
+				PC_WRITE(sign, y, player->mo->y);
 				sign->z = player->mo->z + zofs;
 				sign->old_x = player->mo->old_x;
 				sign->old_y = player->mo->old_y;
@@ -11486,7 +11487,7 @@ void P_DoTailsOverlay(player_t *player, mobj_t *tails)
 	P_SetScale(tails, player->mo->scale, false);
 	tails->destscale = player->mo->destscale;
 	tails->old_scale = player->mo->old_scale;
-	tails->radius = player->mo->radius;
+	PC_WRITE(tails, radius, player->mo->radius);
 	tails->height = player->mo->height;
 	zoffs = FixedMul(zoffs, tails->scale);
 

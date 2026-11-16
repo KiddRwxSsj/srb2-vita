@@ -12,10 +12,12 @@
 /// \brief Movement/collision utility functions, as used by functions in p_map.c
 ///        Blockmap iterator functions, and some PIT_* functions to use for iteration
 
+#include "p_dormant.h"
 #include "doomdef.h"
 #include "doomstat.h"
 
 #include "p_local.h"
+#include "perf_count.h"
 #include "r_main.h"
 #include "r_data.h"
 #include "r_textures.h"
@@ -23,6 +25,9 @@
 #include "p_polyobj.h"
 #include "p_slopes.h"
 #include "z_zone.h"
+#ifdef __vita__
+#include "vita/vita_prof.h"
+#endif
 
 //
 // P_AproxDistance
@@ -711,6 +716,7 @@ static blocknode_t *freeblocks;
 static blocknode_t *P_CreateBlockNode(mobj_t *thing, int x, int y)
 {
 	blocknode_t *block;
+	PC_CellMutationFrom(x + y*bmapwidth, thing, PC_MUT_LINK);
 
 	if (freeblocks != NULL)
 	{
@@ -732,6 +738,7 @@ static blocknode_t *P_CreateBlockNode(mobj_t *thing, int x, int y)
 
 static void P_ReleaseBlockNode(blocknode_t *node)
 {
+	PC_CellMutationFrom(node->blockindex, node->mobj, PC_MUT_UNLINK);
 	node->bnext = freeblocks;
 	freeblocks = node;
 }
@@ -747,10 +754,26 @@ static void P_ReleaseBlockNode(blocknode_t *node)
 // lookups maintaining lists ot things inside
 // these structures need to be updated.
 //
+#ifdef __vita__
+static void P_DoUnsetThingPosition(mobj_t *thing);
+
 void P_UnsetThingPosition(mobj_t *thing)
+{
+	UINT32 saved = VITA_SamplePush(VSAMPLE_UNLINK);
+
+	P_DoUnsetThingPosition(thing);
+	VITA_SamplePop(saved);
+}
+
+static void P_DoUnsetThingPosition(mobj_t *thing)
+#else
+void P_UnsetThingPosition(mobj_t *thing)
+#endif
 {
 	I_Assert(thing != NULL);
 	I_Assert(!P_MobjWasRemoved(thing));
+	P_DormantTouch(thing);
+	PC_UnlinkBegin(thing);
 
 	if (!(thing->flags & MF_NOSECTOR))
 	{
@@ -819,7 +842,21 @@ void P_UnsetPrecipThingPosition(precipmobj_t *thing)
 // based on it's x y.
 // Sets thing->subsector properly
 //
+#ifdef __vita__
+static void P_DoSetThingPosition(mobj_t *thing);
+
 void P_SetThingPosition(mobj_t *thing)
+{
+	UINT32 saved = VITA_SamplePush(VSAMPLE_LINK);
+
+	P_DoSetThingPosition(thing);
+	VITA_SamplePop(saved);
+}
+
+static void P_DoSetThingPosition(mobj_t *thing)
+#else
+void P_SetThingPosition(mobj_t *thing)
+#endif
 {                                                      // link into subsector
 	subsector_t *ss;
 	sector_t *oldsec = NULL;
@@ -827,6 +864,7 @@ void P_SetThingPosition(mobj_t *thing)
 
 	I_Assert(thing != NULL);
 	I_Assert(!P_MobjWasRemoved(thing));
+	P_DormantTouch(thing);
 
 	if (thing->player && thing->z <= thing->floorz && thing->subsector)
 		oldsec = thing->subsector->sector;
@@ -909,6 +947,8 @@ void P_SetThingPosition(mobj_t *thing)
 			}
 		}
 	}
+
+	PC_LinkEnd(thing);
 
 	// Allows you to 'step' on a new linedef exec when the previous
 	// sector's floor is the same height.
