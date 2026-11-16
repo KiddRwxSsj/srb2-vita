@@ -10,12 +10,14 @@
 /// \file  lua_mobjlib.c
 /// \brief mobj/thing library for Lua scripting
 
+#include "p_dormant.h"
 #include "doomdef.h"
 #include "fastcmp.h"
 #include "r_data.h"
 #include "r_skins.h"
 #include "r_translation.h"
 #include "p_local.h"
+#include "perf_count.h"
 #include "g_game.h"
 #include "p_setup.h"
 
@@ -522,6 +524,7 @@ static int mobj_set(lua_State *L)
 	if (hook_cmd_running)
 		return luaL_error(L, "Do not alter mobj_t in CMD building code!");
 
+	P_DormantTouch(mo);
 	switch(field)
 	{
 	case mobj_valid:
@@ -621,9 +624,9 @@ static int mobj_set(lua_State *L)
 	case mobj_radius:
 	{
 		mobj_t *ptmthing = tmthing;
-		mo->radius = luaL_checkfixed(L, 3);
+		PC_WRITE(mo, radius, luaL_checkfixed(L, 3));
 		if (mo->radius < 0)
-			mo->radius = 0;
+			PC_WRITE(mo, radius, 0);
 		P_CheckPosition(mo, mo->x, mo->y);
 		mo->floorz = tmfloorz;
 		mo->ceilingz = tmceilingz;

@@ -18,6 +18,7 @@
 #include "p_local.h"
 
 #include "lua_script.h"
+#include "p_dormant.h"
 #include "lua_libs.h"
 #include "lua_hud.h" // hud_running errors
 #include "lua_hook.h" // hook_cmd_running errors
@@ -875,7 +876,8 @@ static int player_set(lua_State *L)
 	case player_mo:
 	case player_realmo:
 	{
-		mobj_t *newmo = *((mobj_t **)luaL_checkudata(L, 3, META_MOBJ));
+		mobj_t *newmo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 3, META_MOBJ)));
+		P_DormantTouch(plr->mo);
 		plr->mo->player = NULL; // remove player pointer from old mobj
 		(newmo->player = plr)->mo = newmo; // set player pointer for new mobj, and set new mobj as the player's mobj
 		break;
@@ -1017,7 +1019,7 @@ static int player_set(lua_State *L)
 	{
 		mobj_t *mo = NULL;
 		if (!lua_isnil(L, 3))
-			mo = *((mobj_t **)luaL_checkudata(L, 3, META_MOBJ));
+			mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 3, META_MOBJ)));
 		P_SetTarget(&plr->followmobj, mo);
 		break;
 	}
@@ -1151,7 +1153,7 @@ static int player_set(lua_State *L)
 	{
 		mobj_t *mo = NULL;
 		if (!lua_isnil(L, 3))
-			mo = *((mobj_t **)luaL_checkudata(L, 3, META_MOBJ));
+			mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 3, META_MOBJ)));
 		P_SetTarget(&plr->axis1, mo);
 		break;
 	}
@@ -1159,7 +1161,7 @@ static int player_set(lua_State *L)
 	{
 		mobj_t *mo = NULL;
 		if (!lua_isnil(L, 3))
-			mo = *((mobj_t **)luaL_checkudata(L, 3, META_MOBJ));
+			mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 3, META_MOBJ)));
 		P_SetTarget(&plr->axis2, mo);
 		break;
 	}
@@ -1197,7 +1199,7 @@ static int player_set(lua_State *L)
 	{
 		mobj_t *mo = NULL;
 		if (!lua_isnil(L, 3))
-			mo = *((mobj_t **)luaL_checkudata(L, 3, META_MOBJ));
+			mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 3, META_MOBJ)));
 		P_SetTarget(&plr->capsule, mo);
 		break;
 	}
@@ -1205,7 +1207,7 @@ static int player_set(lua_State *L)
 	{
 		mobj_t *mo = NULL;
 		if (!lua_isnil(L, 3))
-			mo = *((mobj_t **)luaL_checkudata(L, 3, META_MOBJ));
+			mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 3, META_MOBJ)));
 		P_SetTarget(&plr->drone, mo);
 		break;
 	}
@@ -1297,7 +1299,7 @@ static int player_set(lua_State *L)
 	{
 		mobj_t *mo = NULL;
 		if (!lua_isnil(L, 3))
-			mo = *((mobj_t **)luaL_checkudata(L, 3, META_MOBJ));
+			mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 3, META_MOBJ)));
 		if (plr->awayviewmobj != mo) {
 			P_SetTarget(&plr->awayviewmobj, mo);
 			if (plr->awayviewtics) {

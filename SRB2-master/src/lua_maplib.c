@@ -16,6 +16,7 @@
 #include "p_setup.h"
 #include "z_zone.h"
 #include "p_slopes.h"
+#include "perf_count.h"
 #include "p_polyobj.h"
 #include "r_main.h"
 
@@ -2639,6 +2640,7 @@ static int slope_set(lua_State *L)
 	default:
 		return luaL_error(L, "pslope_t has no field named " LUA_QS ".", lua_tostring(L, 2));
 	case slope_o: { // o
+		PC_SlopeLuaWrite(slope);
 		luaL_checktype(L, 3, LUA_TTABLE);
 
 		lua_getfield(L, 3, "x");
@@ -2684,6 +2686,7 @@ static int slope_set(lua_State *L)
 		break;
 	}
 	case slope_zdelta: { // zdelta
+		PC_SlopeLuaWrite(slope);
 		slope->zdelta = luaL_checkfixed(L, 3);
 		slope->zangle = R_PointToAngle2(0, 0, FRACUNIT, -slope->zdelta);
 		slope->dzdelta = FixedToDouble(slope->zdelta);
@@ -2694,6 +2697,7 @@ static int slope_set(lua_State *L)
 		angle_t zangle = luaL_checkangle(L, 3);
 		if (zangle == ANGLE_90 || zangle == ANGLE_270)
 			return luaL_error(L, "invalid zangle for slope!");
+		PC_SlopeLuaWrite(slope);
 		slope->zangle = zangle;
 		slope->zdelta = -FINETANGENT(((slope->zangle+ANGLE_90)>>ANGLETOFINESHIFT) & 4095);
 		slope->dzdelta = FixedToDouble(slope->zdelta);
@@ -2701,6 +2705,7 @@ static int slope_set(lua_State *L)
 		break;
 	}
 	case slope_xydirection: // xydirection
+		PC_SlopeLuaWrite(slope);
 		slope->xydirection = luaL_checkangle(L, 3);
 		slope->d.x = -FINECOSINE((slope->xydirection>>ANGLETOFINESHIFT) & FINEMASK);
 		slope->d.y = -FINESINE((slope->xydirection>>ANGLETOFINESHIFT) & FINEMASK);

@@ -10,6 +10,7 @@
 /// \file  lua_baselib.c
 /// \brief basic functions for Lua scripting
 
+#include "p_dormant.h"
 #include "doomdef.h"
 #include "fastcmp.h"
 #include "p_local.h"
@@ -565,7 +566,7 @@ static int lib_pPointOnLineSide(lua_State *L)
 
 static int lib_pCheckMeleeRange(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!actor)
@@ -576,7 +577,7 @@ static int lib_pCheckMeleeRange(lua_State *L)
 
 static int lib_pJetbCheckMeleeRange(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!actor)
@@ -587,7 +588,7 @@ static int lib_pJetbCheckMeleeRange(lua_State *L)
 
 static int lib_pFaceStabCheckMeleeRange(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!actor)
@@ -598,7 +599,7 @@ static int lib_pFaceStabCheckMeleeRange(lua_State *L)
 
 static int lib_pSkimCheckMeleeRange(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!actor)
@@ -609,7 +610,7 @@ static int lib_pSkimCheckMeleeRange(lua_State *L)
 
 static int lib_pCheckMissileRange(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!actor)
@@ -620,7 +621,7 @@ static int lib_pCheckMissileRange(lua_State *L)
 
 static int lib_pNewChaseDir(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!actor)
@@ -631,7 +632,7 @@ static int lib_pNewChaseDir(lua_State *L)
 
 static int lib_pLookForPlayers(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t dist = (fixed_t)luaL_optinteger(L, 2, 0);
 	boolean allaround = lua_optboolean(L, 3);
 	boolean tracer = lua_optboolean(L, 4);
@@ -661,7 +662,7 @@ static int lib_pSpawnMobj(lua_State *L)
 
 static int lib_pSpawnMobjFromMobj(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t x = luaL_checkfixed(L, 2);
 	fixed_t y = luaL_checkfixed(L, 3);
 	fixed_t z = luaL_checkfixed(L, 4);
@@ -677,7 +678,7 @@ static int lib_pSpawnMobjFromMobj(lua_State *L)
 
 static int lib_pRemoveMobj(lua_State *L)
 {
-	mobj_t *th = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *th = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!th)
@@ -690,7 +691,7 @@ static int lib_pRemoveMobj(lua_State *L)
 
 static int lib_pIsValidSprite2(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	UINT16 spr2 = (UINT16)luaL_checkinteger(L, 2);
 	//HUDSAFE
 	INLEVEL
@@ -705,7 +706,7 @@ static int lib_pIsValidSprite2(lua_State *L)
 static int lib_pSpawnLockOn(lua_State *L)
 {
 	player_t *player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
-	mobj_t *lockon = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *lockon = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	statenum_t state = luaL_checkinteger(L, 3);
 	NOHUD
 	INLEVEL
@@ -728,8 +729,8 @@ static int lib_pSpawnLockOn(lua_State *L)
 
 static int lib_pSpawnMissile(lua_State *L)
 {
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	mobj_t *dest = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
+	mobj_t *dest = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	mobjtype_t type = luaL_checkinteger(L, 3);
 	NOHUD
 	INLEVEL
@@ -742,8 +743,8 @@ static int lib_pSpawnMissile(lua_State *L)
 
 static int lib_pSpawnXYZMissile(lua_State *L)
 {
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	mobj_t *dest = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
+	mobj_t *dest = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	mobjtype_t type = luaL_checkinteger(L, 3);
 	fixed_t x = luaL_checkfixed(L, 4);
 	fixed_t y = luaL_checkfixed(L, 5);
@@ -759,7 +760,7 @@ static int lib_pSpawnXYZMissile(lua_State *L)
 
 static int lib_pSpawnPointMissile(lua_State *L)
 {
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t xa = luaL_checkfixed(L, 2);
 	fixed_t ya = luaL_checkfixed(L, 3);
 	fixed_t za = luaL_checkfixed(L, 4);
@@ -778,7 +779,7 @@ static int lib_pSpawnPointMissile(lua_State *L)
 
 static int lib_pSpawnAlteredDirectionMissile(lua_State *L)
 {
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	mobjtype_t type = luaL_checkinteger(L, 2);
 	fixed_t x = luaL_checkfixed(L, 3);
 	fixed_t y = luaL_checkfixed(L, 4);
@@ -795,7 +796,7 @@ static int lib_pSpawnAlteredDirectionMissile(lua_State *L)
 
 static int lib_pColorTeamMissile(lua_State *L)
 {
-	mobj_t *missile = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *missile = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	player_t *source = *((player_t **)luaL_checkudata(L, 2, META_PLAYER));
 	NOHUD
 	INLEVEL
@@ -809,7 +810,7 @@ static int lib_pColorTeamMissile(lua_State *L)
 
 static int lib_pSPMAngle(lua_State *L)
 {
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	mobjtype_t type = luaL_checkinteger(L, 2);
 	angle_t angle = luaL_checkangle(L, 3);
 	UINT8 allowaim = (UINT8)luaL_optinteger(L, 4, 0);
@@ -825,7 +826,7 @@ static int lib_pSPMAngle(lua_State *L)
 
 static int lib_pSpawnPlayerMissile(lua_State *L)
 {
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	mobjtype_t type = luaL_checkinteger(L, 2);
 	UINT32 flags2 = (UINT32)luaL_optinteger(L, 3, 0);
 	NOHUD
@@ -839,7 +840,7 @@ static int lib_pSpawnPlayerMissile(lua_State *L)
 
 static int lib_pMobjFlip(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	//HUDSAFE
 	INLEVEL
 	if (!mobj)
@@ -850,7 +851,7 @@ static int lib_pMobjFlip(lua_State *L)
 
 static int lib_pGetMobjGravity(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	//HUDSAFE
 	INLEVEL
 	if (!mobj)
@@ -883,7 +884,7 @@ static int lib_pFlashPal(lua_State *L)
 
 static int lib_pGetClosestAxis(lua_State *L)
 {
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	//HUDSAFE
 	INLEVEL
 	if (!source)
@@ -916,7 +917,7 @@ static int lib_pSpawnParaloop(lua_State *L)
 
 static int lib_pBossTargetPlayer(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	boolean closest = lua_optboolean(L, 2);
 	NOHUD
 	INLEVEL
@@ -928,7 +929,7 @@ static int lib_pBossTargetPlayer(lua_State *L)
 
 static int lib_pSupermanLook4Players(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!actor)
@@ -939,7 +940,7 @@ static int lib_pSupermanLook4Players(lua_State *L)
 
 static int lib_pSetScale(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t newscale = luaL_checkfixed(L, 2);
 	boolean instant = lua_optboolean(L, 3);
 	NOHUD
@@ -954,7 +955,7 @@ static int lib_pSetScale(lua_State *L)
 
 static int lib_pInsideANonSolidFFloor(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	ffloor_t *rover = *((ffloor_t **)luaL_checkudata(L, 2, META_FFLOOR));
 	//HUDSAFE
 	INLEVEL
@@ -968,7 +969,7 @@ static int lib_pInsideANonSolidFFloor(lua_State *L)
 
 static int lib_pCheckDeathPitCollide(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	//HUDSAFE
 	INLEVEL
 	if (!mo)
@@ -1004,7 +1005,7 @@ static int lib_pCanRunOnWater(lua_State *L)
 
 static int lib_pMaceRotate(lua_State *L)
 {
-	mobj_t *center = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *center = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	INT32 baserot = luaL_checkinteger(L, 2);
 	INT32 baseprevrot = luaL_checkinteger(L, 3);
 	NOHUD
@@ -1017,7 +1018,7 @@ static int lib_pMaceRotate(lua_State *L)
 
 static int lib_pCreateFloorSpriteSlope(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!mobj)
@@ -1028,7 +1029,7 @@ static int lib_pCreateFloorSpriteSlope(lua_State *L)
 
 static int lib_pRemoveFloorSpriteSlope(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!mobj)
@@ -1039,7 +1040,7 @@ static int lib_pRemoveFloorSpriteSlope(lua_State *L)
 
 static int lib_pRailThinker(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	mobj_t *ptmthing = tmthing;
 	NOHUD
 	INLEVEL
@@ -1052,7 +1053,7 @@ static int lib_pRailThinker(lua_State *L)
 
 static int lib_pCheckSkyHit(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	line_t *line = *((line_t **)luaL_checkudata(L, 2, META_LINE));
 	//HUDSAFE
 	INLEVEL
@@ -1066,7 +1067,7 @@ static int lib_pCheckSkyHit(lua_State *L)
 
 static int lib_pXYMovement(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	mobj_t *ptmthing = tmthing;
 	NOHUD
 	INLEVEL
@@ -1079,7 +1080,7 @@ static int lib_pXYMovement(lua_State *L)
 
 static int lib_pRingXYMovement(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	mobj_t *ptmthing = tmthing;
 	NOHUD
 	INLEVEL
@@ -1092,7 +1093,7 @@ static int lib_pRingXYMovement(lua_State *L)
 
 static int lib_pSceneryXYMovement(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	mobj_t *ptmthing = tmthing;
 	NOHUD
 	INLEVEL
@@ -1105,7 +1106,7 @@ static int lib_pSceneryXYMovement(lua_State *L)
 
 static int lib_pZMovement(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	mobj_t *ptmthing = tmthing;
 	NOHUD
 	INLEVEL
@@ -1120,7 +1121,7 @@ static int lib_pZMovement(lua_State *L)
 
 static int lib_pRingZMovement(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	mobj_t *ptmthing = tmthing;
 	NOHUD
 	INLEVEL
@@ -1134,7 +1135,7 @@ static int lib_pRingZMovement(lua_State *L)
 
 static int lib_pSceneryZMovement(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	mobj_t *ptmthing = tmthing;
 	NOHUD
 	INLEVEL
@@ -1149,7 +1150,7 @@ static int lib_pSceneryZMovement(lua_State *L)
 
 static int lib_pPlayerZMovement(lua_State *L)
 {
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	mobj_t *ptmthing = tmthing;
 	NOHUD
 	INLEVEL
@@ -1252,9 +1253,9 @@ static int lib_pDoPlayerPain(lua_State *L)
 	if (!player)
 		return LUA_ErrInvalid(L, "player_t");
 	if (!lua_isnone(L, 2) && lua_isuserdata(L, 2))
-		source = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+		source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	if (!lua_isnone(L, 3) && lua_isuserdata(L, 3))
-		inflictor = *((mobj_t **)luaL_checkudata(L, 3, META_MOBJ));
+		inflictor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 3, META_MOBJ)));
 	P_DoPlayerPain(player, source, inflictor);
 	return 0;
 }
@@ -1273,7 +1274,7 @@ static int lib_pResetPlayer(lua_State *L)
 static int lib_pPlayerCanDamage(lua_State *L)
 {
 	player_t *player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
-	mobj_t *thing = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *thing = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	NOHUD // was hud safe but then i added a lua hook
 	INLEVEL
 	if (!player)
@@ -1297,7 +1298,7 @@ static int lib_pPlayerFullbright(lua_State *L)
 
 static int lib_pIsObjectInGoop(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	//HUDSAFE
 	INLEVEL
 	if (!mo)
@@ -1308,7 +1309,7 @@ static int lib_pIsObjectInGoop(lua_State *L)
 
 static int lib_pIsObjectOnGround(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	//HUDSAFE
 	INLEVEL
 	if (!mo)
@@ -1319,7 +1320,7 @@ static int lib_pIsObjectOnGround(lua_State *L)
 
 static int lib_pInSpaceSector(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	//HUDSAFE
 	INLEVEL
 	if (!mo)
@@ -1330,7 +1331,7 @@ static int lib_pInSpaceSector(lua_State *L)
 
 static int lib_pInQuicksand(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	//HUDSAFE
 	INLEVEL
 	if (!mo)
@@ -1341,7 +1342,7 @@ static int lib_pInQuicksand(lua_State *L)
 
 static int lib_pInJumpFlipSector(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	//HUDSAFE
 	INLEVEL
 	if (!mo)
@@ -1352,7 +1353,7 @@ static int lib_pInJumpFlipSector(lua_State *L)
 
 static int lib_pSetObjectMomZ(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t value = luaL_checkfixed(L, 2);
 	boolean relative = lua_optboolean(L, 3);
 	NOHUD
@@ -1448,7 +1449,7 @@ static int lib_pSpawnShieldOrb(lua_State *L)
 
 static int lib_pSpawnGhostMobj(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!mobj)
@@ -1613,7 +1614,7 @@ static int lib_pDoPlayerExit(lua_State *L)
 
 static int lib_pInstaThrust(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	angle_t angle = luaL_checkangle(L, 2);
 	fixed_t move = luaL_checkfixed(L, 3);
 	NOHUD
@@ -1626,7 +1627,7 @@ static int lib_pInstaThrust(lua_State *L)
 
 static int lib_pInstaThrustEvenIn2D(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	angle_t angle = luaL_checkangle(L, 2);
 	fixed_t move = luaL_checkfixed(L, 3);
 	NOHUD
@@ -1678,8 +1679,8 @@ static int lib_pLookForEnemies(lua_State *L)
 
 static int lib_pNukeEnemies(lua_State *L)
 {
-	mobj_t *inflictor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *inflictor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	fixed_t radius = luaL_checkfixed(L, 3);
 	NOHUD
 	INLEVEL
@@ -1691,8 +1692,8 @@ static int lib_pNukeEnemies(lua_State *L)
 
 static int lib_pEarthquake(lua_State *L)
 {
-	mobj_t *inflictor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *inflictor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	fixed_t radius = luaL_checkfixed(L, 3);
 	NOHUD
 	INLEVEL
@@ -1704,8 +1705,8 @@ static int lib_pEarthquake(lua_State *L)
 
 static int lib_pHomingAttack(lua_State *L)
 {
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	mobj_t *enemy = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
+	mobj_t *enemy = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!source || !enemy)
@@ -1814,7 +1815,7 @@ static int lib_pSwitchShield(lua_State *L)
 static int lib_pDoTailsOverlay(lua_State *L)
 {
 	player_t *player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
-	mobj_t *tails = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *tails = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!player)
@@ -1828,7 +1829,7 @@ static int lib_pDoTailsOverlay(lua_State *L)
 static int lib_pDoMetalJetFume(lua_State *L)
 {
 	player_t *player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
-	mobj_t *fume = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *fume = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!player)
@@ -1842,7 +1843,7 @@ static int lib_pDoMetalJetFume(lua_State *L)
 static int lib_pDoFollowMobj(lua_State *L)
 {
 	player_t *player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
-	mobj_t *followmobj = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *followmobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!player)
@@ -1879,7 +1880,7 @@ static int lib_pPlayerShouldUseSpinHeight(lua_State *L)
 static int lib_pCheckPosition(lua_State *L)
 {
 	mobj_t *ptmthing = tmthing;
-	mobj_t *thing = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *thing = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t x = luaL_checkfixed(L, 2);
 	fixed_t y = luaL_checkfixed(L, 3);
 	NOHUD
@@ -1895,7 +1896,7 @@ static int lib_pCheckPosition(lua_State *L)
 static int lib_pTryMove(lua_State *L)
 {
 	mobj_t *ptmthing = tmthing;
-	mobj_t *thing = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *thing = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t x = luaL_checkfixed(L, 2);
 	fixed_t y = luaL_checkfixed(L, 3);
 	boolean allowdropoff = lua_optboolean(L, 4);
@@ -1912,7 +1913,7 @@ static int lib_pTryMove(lua_State *L)
 static int lib_pMove(lua_State *L)
 {
 	mobj_t *ptmthing = tmthing;
-	mobj_t *actor = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t speed = luaL_checkfixed(L, 2);
 	NOHUD
 	INLEVEL
@@ -1928,7 +1929,7 @@ static int lib_pMove(lua_State *L)
 static int lib_pTeleportMove(lua_State *L)
 {
 	mobj_t *ptmthing = tmthing;
-	mobj_t *thing = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *thing = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t x = luaL_checkfixed(L, 2);
 	fixed_t y = luaL_checkfixed(L, 3);
 	fixed_t z = luaL_checkfixed(L, 4);
@@ -1946,7 +1947,7 @@ static int lib_pTeleportMove(lua_State *L)
 static int lib_pSetOrigin(lua_State *L)
 {
 	mobj_t *ptmthing = tmthing;
-	mobj_t *thing = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *thing = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t x = luaL_checkfixed(L, 2);
 	fixed_t y = luaL_checkfixed(L, 3);
 	fixed_t z = luaL_checkfixed(L, 4);
@@ -1963,7 +1964,7 @@ static int lib_pSetOrigin(lua_State *L)
 static int lib_pMoveOrigin(lua_State *L)
 {
 	mobj_t *ptmthing = tmthing;
-	mobj_t *thing = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *thing = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t x = luaL_checkfixed(L, 2);
 	fixed_t y = luaL_checkfixed(L, 3);
 	fixed_t z = luaL_checkfixed(L, 4);
@@ -1979,7 +1980,7 @@ static int lib_pMoveOrigin(lua_State *L)
 
 static int lib_pLineIsBlocking(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	line_t *line = *((line_t **)luaL_checkudata(L, 2, META_LINE));
 	NOHUD
 	INLEVEL
@@ -2018,7 +2019,7 @@ static int lib_pLineIsBlocking(lua_State *L)
 
 static int lib_pSlideMove(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!mo)
@@ -2029,7 +2030,7 @@ static int lib_pSlideMove(lua_State *L)
 
 static int lib_pBounceMove(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!mo)
@@ -2040,8 +2041,8 @@ static int lib_pBounceMove(lua_State *L)
 
 static int lib_pCheckSight(lua_State *L)
 {
-	mobj_t *t1 = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	mobj_t *t2 = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *t1 = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
+	mobj_t *t2 = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	//HUDSAFE?
 	INLEVEL
 	if (!t1 || !t2)
@@ -2052,7 +2053,7 @@ static int lib_pCheckSight(lua_State *L)
 
 static int lib_pCheckHoopPosition(lua_State *L)
 {
-	mobj_t *hoopthing = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *hoopthing = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	fixed_t x = luaL_checkfixed(L, 2);
 	fixed_t y = luaL_checkfixed(L, 3);
 	fixed_t z = luaL_checkfixed(L, 4);
@@ -2067,8 +2068,8 @@ static int lib_pCheckHoopPosition(lua_State *L)
 
 static int lib_pRadiusAttack(lua_State *L)
 {
-	mobj_t *spot = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *spot = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	fixed_t damagedist = luaL_checkfixed(L, 3);
 	UINT8 damagetype = luaL_optinteger(L, 4, 0);
 	boolean sightcheck = lua_opttrueboolean(L, 5);
@@ -2152,8 +2153,8 @@ static int lib_pGetSectorColormapAt(lua_State *L)
 
 static int lib_pDoSpring(lua_State *L)
 {
-	mobj_t *spring = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	mobj_t *object = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *spring = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
+	mobj_t *object = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!spring || !object)
@@ -2209,7 +2210,7 @@ static int lib_pRemoveShield(lua_State *L)
 
 static int lib_pDamageMobj(lua_State *L)
 {
-	mobj_t *target = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)), *inflictor = NULL, *source = NULL;
+	mobj_t *target = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ))), *inflictor = NULL, *source = NULL;
 	INT32 damage;
 	UINT8 damagetype;
 	NOHUD
@@ -2217,9 +2218,9 @@ static int lib_pDamageMobj(lua_State *L)
 	if (!target)
 		return LUA_ErrInvalid(L, "mobj_t");
 	if (!lua_isnone(L, 2) && lua_isuserdata(L, 2))
-		inflictor = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+		inflictor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	if (!lua_isnone(L, 3) && lua_isuserdata(L, 3))
-		source = *((mobj_t **)luaL_checkudata(L, 3, META_MOBJ));
+		source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 3, META_MOBJ)));
 	damage = (INT32)luaL_optinteger(L, 4, 1);
 	damagetype = (UINT8)luaL_optinteger(L, 5, 0);
 	lua_pushboolean(L, P_DamageMobj(target, inflictor, source, damage, damagetype));
@@ -2228,16 +2229,16 @@ static int lib_pDamageMobj(lua_State *L)
 
 static int lib_pKillMobj(lua_State *L)
 {
-	mobj_t *target = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)), *inflictor = NULL, *source = NULL;
+	mobj_t *target = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ))), *inflictor = NULL, *source = NULL;
 	UINT8 damagetype;
 	NOHUD
 	INLEVEL
 	if (!target)
 		return LUA_ErrInvalid(L, "mobj_t");
 	if (!lua_isnone(L, 2) && lua_isuserdata(L, 2))
-		inflictor = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+		inflictor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	if (!lua_isnone(L, 3) && lua_isuserdata(L, 3))
-		source = *((mobj_t **)luaL_checkudata(L, 3, META_MOBJ));
+		source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 3, META_MOBJ)));
 	damagetype = (UINT8)luaL_optinteger(L, 4, 0);
 	P_KillMobj(target, inflictor, source, damagetype);
 	return 0;
@@ -2316,7 +2317,7 @@ static int lib_pPlayerFlagBurst(lua_State *L)
 
 static int lib_pPlayRinglossSound(lua_State *L)
 {
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	player_t *player = NULL;
 	NOHUD
 	INLEVEL
@@ -2335,7 +2336,7 @@ static int lib_pPlayRinglossSound(lua_State *L)
 
 static int lib_pPlayDeathSound(lua_State *L)
 {
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	player_t *player = NULL;
 	NOHUD
 	INLEVEL
@@ -2354,7 +2355,7 @@ static int lib_pPlayDeathSound(lua_State *L)
 
 static int lib_pPlayVictorySound(lua_State *L)
 {
-	mobj_t *source = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *source = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	player_t *player = NULL;
 	NOHUD
 	INLEVEL
@@ -2422,8 +2423,8 @@ static int lib_pDoMatchSuper(lua_State *L)
 
 static int lib_pTouchSpecialThing(lua_State *L)
 {
-	mobj_t *special = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	mobj_t *toucher = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+	mobj_t *special = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
+	mobj_t *toucher = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	boolean heightcheck = lua_optboolean(L, 3);
 	NOHUD
 	INLEVEL
@@ -2440,7 +2441,7 @@ static int lib_pTouchSpecialThing(lua_State *L)
 
 static int lib_pThrust(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	angle_t angle = luaL_checkangle(L, 2);
 	fixed_t move = luaL_checkfixed(L, 3);
 	NOHUD
@@ -2453,7 +2454,7 @@ static int lib_pThrust(lua_State *L)
 
 static int lib_pThrustEvenIn2D(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	angle_t angle = luaL_checkangle(L, 2);
 	fixed_t move = luaL_checkfixed(L, 3);
 	NOHUD
@@ -2476,7 +2477,7 @@ static int lib_pVectorInstaThrust(lua_State *L)
     fixed_t zb = luaL_checkfixed(L, 8);
     fixed_t zc = luaL_checkfixed(L, 9);
     fixed_t momentum = luaL_checkfixed(L, 10);
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 11, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 11, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!mo)
@@ -2487,7 +2488,7 @@ static int lib_pVectorInstaThrust(lua_State *L)
 
 static int lib_pSetMobjStateNF(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	statenum_t state = luaL_checkinteger(L, 2);
 	NOHUD
 	INLEVEL
@@ -2526,7 +2527,7 @@ static int lib_pDoSuperDetransformation(lua_State *L)
 
 static int lib_pExplodeMissile(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!mo)
@@ -2551,7 +2552,7 @@ static int lib_pMobjTouchingSectorSpecial(lua_State *L)
 // TODO: 2.3: Delete
 static int lib_pThingOnSpecial3DFloor(lua_State *L)
 {
-	mobj_t *mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!mo)
@@ -2704,7 +2705,7 @@ static int lib_pLinedefExecute(lua_State *L)
 	NOHUD
 	INLEVEL
 	if (!lua_isnone(L, 2) && lua_isuserdata(L, 2))
-		actor = *((mobj_t **)luaL_checkudata(L, 2, META_MOBJ));
+		actor = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 2, META_MOBJ)));
 	if (!lua_isnone(L, 3) && lua_isuserdata(L, 3))
 		caller = *((sector_t **)luaL_checkudata(L, 3, META_SECTOR));
 	P_LinedefExecute(tag, actor, caller);
@@ -2773,7 +2774,7 @@ static int lib_pSetSkyboxMobj(lua_State *L)
 	INLEVEL
 	if (!lua_isnil(L,1)) // nil leaves mo as NULL to remove the skybox rendering.
 	{
-		mo = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)); // otherwise it is a skybox mobj.
+		mo = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ))); // otherwise it is a skybox mobj.
 		if (!mo)
 			return LUA_ErrInvalid(L, "mobj_t");
 	}
@@ -2949,7 +2950,7 @@ static int lib_pGetZAt(lua_State *L)
 
 static int lib_pButteredSlope(lua_State *L)
 {
-	mobj_t *mobj = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	mobj_t *mobj = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 	NOHUD
 	INLEVEL
 	if (!mobj)
@@ -3242,7 +3243,7 @@ static int GetValidSoundOrigin(lua_State *L, void **origin)
 
 	if (fasticmp(type, "mobj_t"))
 	{
-		*origin = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+		*origin = P_DormantLua(*((mobj_t **)luaL_checkudata(L, 1, META_MOBJ)));
 		if (!(*origin))
 			return LUA_ErrInvalid(L, "mobj_t");
 		return 1;

@@ -10,6 +10,7 @@
 /// \file  lua_hooklib.c
 /// \brief hooks for Lua scripting
 
+#include "p_dormant.h"
 #include "doomdef.h"
 #include "doomstat.h"
 #include "p_mobj.h"
@@ -26,6 +27,7 @@
 #include "m_perfstats.h"
 #include "netcode/d_netcmd.h" // for cv_perfstats
 #include "i_system.h" // I_GetPreciseTime
+#include "perf_count.h"
 
 /* =========================================================================
                                   ABSTRACTION
@@ -54,6 +56,10 @@ typedef struct {
 static hook_t hookIds[HOOK(MAX)];
 static hook_t hudHookIds[HUD_HOOK(MAX)];
 static hook_t mobjHookIds[NUMMOBJTYPES][MOBJ_HOOK(MAX)];
+static boolean dormant_type_hooks[NUMMOBJTYPES];
+#ifdef SRB2_PERF_COUNT
+static boolean perf_any_collide;
+#endif
 
 // Lua tables are used to lookup string hook ids.
 static stringhook_t stringHooks[STRING_HOOK(MAX)];
@@ -74,6 +80,21 @@ static boolean mobj_hook_available(int hook_type, mobjtype_t mobj_type)
 				mobjHookIds [MT_NULL] [hook_type].numHooks > 0 ||
 				(mobj_type < NUMMOBJTYPES && mobjHookIds[mobj_type][hook_type].numHooks > 0)
 		);
+}
+
+#ifdef SRB2_PERF_COUNT
+boolean LUA_PerfCollisionHooks(mobjtype_t type)
+{
+	return perf_any_collide
+		|| mobj_hook_available(MOBJ_HOOK(MobjCollide), type)
+		|| mobj_hook_available(MOBJ_HOOK(MobjMoveCollide), type)
+		|| mobj_hook_available(MOBJ_HOOK(MobjLineCollide), type);
+}
+#endif
+
+boolean LUA_DormantHook(mobjtype_t type)
+{
+	return dormant_type_hooks[MT_NULL] || (type < NUMMOBJTYPES && dormant_type_hooks[type]);
 }
 
 static unsigned hook_in_list
@@ -171,6 +192,11 @@ static void add_mobj_hook(lua_State *L, int hook_type)
 	luaL_argcheck(L, mobj_type < NUMMOBJTYPES, 3, "invalid mobjtype_t");
 
 	add_hook(&mobjHookIds[mobj_type][hook_type]);
+	dormant_type_hooks[mobj_type] = true;
+#ifdef SRB2_PERF_COUNT
+	if (hook_type == MOBJ_HOOK(MobjCollide))
+		perf_any_collide = true;
+#endif
 }
 
 static void add_hud_hook(lua_State *L, int idx)

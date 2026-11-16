@@ -11,9 +11,11 @@
 /// \file  p_tick.c
 /// \brief Archiving: SaveGame I/O, Thinker, Ticker
 
+#include "p_dormant.h"
 #include "doomstat.h"
 #include "g_game.h"
 #include "p_local.h"
+#include "perf_count.h"
 #include "z_zone.h"
 #include "s_sound.h"
 #include "st_stuff.h"
@@ -22,6 +24,9 @@
 #include "lua_script.h"
 #include "lua_hook.h"
 #include "m_perfstats.h"
+#ifdef __vita__
+#include "vita/vita_prof.h"
+#endif
 #include "i_system.h" // I_GetPreciseTime
 #include "r_main.h"
 #include "r_fps.h"
@@ -200,6 +205,8 @@ void Command_CountMobjs_f(void)
 void P_InitThinkers(void)
 {
 	UINT8 i;
+	PC_Reset();
+	P_DormantReset();
 	for (i = 0; i < NUM_THINKERLISTS; i++)
 		thlist[i].prev = thlist[i].next = &thlist[i];
 }
@@ -207,6 +214,8 @@ void P_InitThinkers(void)
 // Adds a new thinker at the end of the list.
 void P_AddThinker(const thinklistnum_t n, thinker_t *thinker)
 {
+	if (n == THINK_DYNSLOPE)
+		PC_ThinkerAdded(thinker);
 #ifdef PARANOIA
 	I_Assert(n < NUM_THINKERLISTS);
 #endif
@@ -218,6 +227,7 @@ void P_AddThinker(const thinklistnum_t n, thinker_t *thinker)
 
 	thinker->references = 0;    // killough 11/98: init reference counter to 0
 	thinker->cachable = n == THINK_MOBJ;
+	if (n == THINK_MOBJ) P_DormantTouch((mobj_t *)thinker);
 
 #ifdef PARANOIA
 	thinker->debug_mobjtype = MT_NULL;
@@ -323,6 +333,7 @@ void P_RemoveThinkerDelayed(thinker_t *thinker)
 	R_DestroyLevelInterpolators(thinker);
 	if (thinker->cachable)
 	{
+		PC_Forget((mobj_t *)thinker);
 		// put cachable thinkers in the mobj cache, so we can avoid allocations
 		((mobj_t *)thinker)->hnext = mobjcache;
 		mobjcache = (mobj_t *)thinker;
@@ -347,7 +358,10 @@ void P_RemoveThinkerDelayed(thinker_t *thinker)
 //
 void P_RemoveThinker(thinker_t *thinker)
 {
+	if (thinker->cachable) P_DormantTouch((mobj_t *)thinker);
 	LUA_InvalidateUserdata(thinker);
+	if (thinker->function == (actionf_p1)P_NullPrecipThinker)
+		precipremovals++;
 	thinker->removing = true;
 	thinker->function = (actionf_p1)P_RemoveThinkerDelayed;
 }
@@ -428,33 +442,64 @@ mobj_t *P_SetTarget2(mobj_t **mop, mobj_t *targ
 // Rewritten to delete nodes implicitly, by making currentthinker
 // external and using P_RemoveThinkerDelayed() implicitly.
 //
+static inline void P_RunThinkerList(size_t i)
+{
+	PS_START_TIMING(ps_thlist_times[i]);
+	for (currentthinker = thlist[i].next; currentthinker != &thlist[i]; currentthinker = currentthinker->next)
+	{
+#ifdef PARANOIA
+		I_Assert(currentthinker->function != NULL);
+#endif
+#ifdef __vita__
+		// The A9 stalls on every cache miss and mobjs are scattered over
+		// the heap; one thinker runs long enough to hide the next one's
+		// loads. PLD never faults, a stale pointer here is harmless.
+		{
+			// Other lists hold small thinkers, a whole mobj worth of lines is wasted bandwidth
+			const char *ahead = (const char *)currentthinker->next;
+			const size_t span = (i == THINK_MOBJ) ? sizeof (mobj_t) : 64;
+			size_t ofs;
+			for (ofs = 0; ofs < span; ofs += 32)
+				__builtin_prefetch(ahead + ofs);
+		}
+		if (vprof_on)
+		{
+			VITA_ProfThinker(i, currentthinker);
+			continue;
+		}
+		if (vsample_on)
+		{
+			VITA_SampleThinker(i, currentthinker);
+			continue;
+		}
+#endif
+		currentthinker->function(currentthinker);
+	}
+	PS_STOP_TIMING(ps_thlist_times[i]);
+}
+
 static inline void P_RunThinkers(void)
 {
 	size_t i;
+	P_DormantUpdate();
 	for (i = 0; i < NUM_THINKERLISTS; i++)
 	{
-		PS_START_TIMING(ps_thlist_times[i]);
-		for (currentthinker = thlist[i].next; currentthinker != &thlist[i]; currentthinker = currentthinker->next)
+		if (i == THINK_PRECIP)
 		{
-#ifdef PARANOIA
-			I_Assert(currentthinker->function != NULL);
-#endif
+			precipresettic++;
 #ifdef __vita__
-			// The A9 stalls on every cache miss and mobjs are scattered over
-			// the heap; one thinker runs long enough to hide the next one's
-			// loads. PLD never faults, a stale pointer here is harmless.
+			// Live drops catch up in P_PrecipCatchUp, the walk is only
+			// needed to free removed ones
+			if (!precipremovals)
 			{
-				const char *ahead = (const char *)currentthinker->next;
-				size_t ofs;
-				for (ofs = 0; ofs < sizeof (mobj_t); ofs += 32)
-					__builtin_prefetch(ahead + ofs);
+				ps_thlist_times[i].value.p = 0;
+				continue;
 			}
+			precipremovals = 0;
 #endif
-			currentthinker->function(currentthinker);
 		}
-		PS_STOP_TIMING(ps_thlist_times[i]);
+		P_RunThinkerList(i);
 	}
-
 }
 
 //

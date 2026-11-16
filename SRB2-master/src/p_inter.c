@@ -11,6 +11,7 @@
 /// \file  p_inter.c
 /// \brief Handling interactions (i.e., collisions)
 
+#include "p_dormant.h"
 #include "doomdef.h"
 #include "i_system.h"
 #include "am_map.h"
@@ -2518,6 +2519,8 @@ void P_KillMobj(mobj_t *target, mobj_t *inflictor, mobj_t *source, UINT8 damaget
 {
 	mobj_t *mo;
 
+	P_DormantTouch(target); P_DormantTouch(inflictor); P_DormantTouch(source);
+
 	if (inflictor && (inflictor->type == MT_SHELL || inflictor->type == MT_FIREBALL))
 		S_StartScreamSound(target, sfx_mario2);
 
@@ -3683,6 +3686,8 @@ boolean P_DamageMobj(mobj_t *target, mobj_t *inflictor, mobj_t *source, INT32 da
 {
 	player_t *player;
 	boolean force = false;
+
+	P_DormantTouch(target); P_DormantTouch(inflictor); P_DormantTouch(source);
 
 	if (objectplacing)
 		return false;
